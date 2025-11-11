@@ -18,13 +18,6 @@ from mcp_server.models import (
     TransformationContract,
 )
 
-try:
-    import pandas as pd  # noqa: F401
-
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
-
 
 def detect_file_encoding(file_path: str) -> str:
     """Detect file encoding"""
