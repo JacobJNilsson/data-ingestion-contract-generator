@@ -1,0 +1,144 @@
+---
+description: Git Workflow and Commit Etiquette
+globs:
+alwaysApply: true
+---
+
+# Git Workflow
+
+## Never Commit Without Explicit Permission
+
+**IMPORTANT**: Do NOT run `git commit`, `git push`, or any other git write commands unless the user explicitly asks you to do so.
+
+When a user asks you to:
+
+- "Create a commit message" → Write the message text only, do NOT run git commit
+- "Write a commit" → Write the message text only, do NOT run git commit
+- "Prepare a commit" → Write the message text only, do NOT run git commit
+- "Make the commit" → Then actually run git commit
+
+The user wants to review commit messages and have control over when commits are created.
+
+### Exception - Multi-step Workflows
+
+If the user explicitly instructs you to **"make commits between each task/step"** at the start of a multi-step workflow:
+
+- Stage all modified files with `git add -A` after completing each step/task
+- Create a commit with an appropriate message following the format above
+- Continue to the next task without asking for permission
+- This applies when working through todo lists or multi-phase implementations
+
+**Example scenario:**
+> User: "Implement features A, B, and C. Make commits between each step."
+>
+> Your workflow:
+>
+> 1. Complete feature A
+> 2. Run `git add -A`
+> 3. Run `git commit` with appropriate message
+> 4. Continue to feature B (repeat steps 1-3)
+> 5. Continue to feature C (repeat steps 1-3)
+
+This delegation of commit control is only active when explicitly requested for workflow automation.
+
+## Commit Message Format
+
+Follow this strict format for all commit messages:
+
+### Subject Line
+
+- Use **imperative mood** (e.g., "Add feature" not "Added feature" or "Adds feature")
+- **Capitalize** the first word
+- **No period** at the end
+- Keep it concise (50 characters or less ideally)
+
+**Good examples:**
+
+- `Add MCP server for contract generation`
+- `Fix UTF-8 BOM handling in CSV parser`
+- `Refactor type detection to scan multiple rows`
+
+**Bad examples:**
+
+- `Added new feature` ❌ (not imperative)
+- `add new feature` ❌ (not capitalized)
+- `Add new feature.` ❌ (has period)
+- `Adds new feature` ❌ (not imperative)
+
+### Body (separated by blank line from subject)
+
+The body should contain two separate paragraphs:
+
+1. **First paragraph - The WHY**: Explain the motivation, problem, or context
+   - Why is this change necessary?
+   - What problem does it solve?
+   - What was the situation before?
+
+2. **Second paragraph - The WHAT**: Describe what was changed at a general level
+   - What does this change introduce?
+   - What is the new behavior or capability?
+   - Keep it general, not specific implementation details
+
+**Do NOT include "the HOW"** - the implementation details should be clear from reading the code itself.
+
+### Example Commit Message
+
+```md
+Add MCP server for data ingestion contract generation
+
+AI agents building data ingestion workflows need structured contracts to
+understand data sources, define destinations, and specify transformations.
+Manual contract creation is error-prone and time-consuming, especially when
+dealing with diverse file formats, international number and date formats,
+and data quality issues like UTF-8 BOMs or sparse data.
+
+This introduces an MCP server that provides tools for automatically analyzing
+data sources and generating validated contracts. The server handles source
+contract generation with automatic schema detection and quality assessment,
+destination contract definition with validation rules, and transformation
+contract creation that maps source to destination. The implementation uses
+Pydantic models for type safety, follows a stateless design returning JSON
+contracts, and includes comprehensive test coverage for data quality edge cases.
+```
+
+## Git Commands - When to Use
+
+### Staging (`git add`)
+
+- You MAY run `git add` when preparing files for review
+- Ask first if unsure whether files should be staged
+
+### Committing (`git commit`)
+
+- **NEVER** run without explicit user request
+- If user asks to "write a commit message", provide the text only
+
+### Pushing (`git push`)
+
+- **NEVER** run without explicit user request
+- Always confirm remote and branch before pushing if asked
+
+### Destructive Operations
+
+- **NEVER** run `git push --force` to main/master
+- **NEVER** run `git reset --hard` without explicit request
+- **NEVER** skip hooks (`--no-verify`, `--no-gpg-sign`)
+- Warn the user if they request destructive operations
+
+## Branch Naming
+
+If suggesting branch names, use this format:
+
+- `feature/description-of-feature`
+- `fix/description-of-fix`
+- `refactor/description-of-refactor`
+- `docs/description-of-docs-change`
+
+Use kebab-case for descriptions.
+
+## General Principles
+
+1. **User has final control**: Always let the user review and approve before writing to git
+2. **Be explicit**: When you provide a commit message, clearly state "Here's the commit message:" so it's obvious you're not committing
+3. **Ask if uncertain**: If unsure whether to stage/commit/push, ask the user first
+4. **Respect workflow**: Some users have specific git workflows (squash, rebase, etc.) - don't assume
