@@ -15,7 +15,7 @@ format-check:
 
 # Run mypy type checker
 mypy:
-	uv run --with mypy mypy .
+	uv run python -m mypy .
 
 # Run tests
 test:
