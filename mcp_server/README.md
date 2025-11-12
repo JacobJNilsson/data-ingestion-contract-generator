@@ -55,10 +55,16 @@ Add to `.cursor/mcp.json`:
    - Returns table names, row counts, column counts, and primary key information
    - Helps discover available tables before generating contracts
 
+6. **generate_database_multi_source_contracts** - Generate contracts for multiple tables with relationship analysis
+   - Automatically detects foreign key relationships between tables
+   - Calculates optimal load order using topological sort
+   - Includes relationship metadata in contracts (dependencies, referenced-by)
+   - Returns: List of JSON contracts with relationship information
+
 ### Analysis & Validation
 
-6. **analyze_source** - Analyze a source file and return raw metadata
-7. **validate_contract** - Validate any contract type (source, destination, or transformation)
+7. **analyze_source** - Analyze a source file and return raw metadata
+8. **validate_contract** - Validate any contract type (source, destination, or transformation)
 
 ## Example Workflows
 
@@ -161,6 +167,88 @@ query_contract = generate_database_source_contract(
 
 # 3. Continue with destination and transformation contracts as above
 ```
+
+### Multi-Table Analysis with Relationships
+
+```python
+# Analyze multiple related tables at once
+contracts = generate_database_multi_source_contracts(
+    connection_string="postgresql://user:pass@localhost:5432/mydb",
+    database_type="postgresql",
+    schema="public",
+    include_relationships=True  # Detect foreign keys and calculate load order
+)
+
+# Returns a list of contracts with relationship metadata:
+# {
+#   "contracts": [
+#     {
+#       "contract_type": "source",
+#       "source_id": "users",
+#       "source_name": "users",
+#       "database_type": "postgresql",
+#       "schema": {...},
+#       "metadata": {
+#         "relationships": {
+#           "foreign_keys": [],  # Tables this table references
+#           "referenced_by": [   # Tables that reference this table
+#             {
+#               "table": "orders",
+#               "columns": ["user_id"],
+#               "referred_columns": ["id"]
+#             }
+#           ]
+#         },
+#         "load_order": 1,       # Load this table first
+#         "depends_on": []       # No dependencies
+#       }
+#     },
+#     {
+#       "contract_type": "source",
+#       "source_id": "orders",
+#       "source_name": "orders",
+#       "database_type": "postgresql",
+#       "schema": {...},
+#       "metadata": {
+#         "relationships": {
+#           "foreign_keys": [    # This table references users
+#             {
+#               "columns": ["user_id"],
+#               "referred_table": "users",
+#               "referred_columns": ["id"]
+#             }
+#           ],
+#           "referenced_by": []
+#         },
+#         "load_order": 2,       # Load after users
+#         "depends_on": ["users"]
+#       }
+#     }
+#   ],
+#   "count": 2
+# }
+
+# Analyze specific tables only
+contracts = generate_database_multi_source_contracts(
+    connection_string="sqlite:///mydb.db",
+    database_type="sqlite",
+    tables=["users", "orders", "products"],  # Specific tables
+    include_relationships=True
+)
+
+# Skip relationship detection for faster analysis
+contracts = generate_database_multi_source_contracts(
+    connection_string="mysql://user:pass@localhost:3306/mydb",
+    database_type="mysql",
+    include_relationships=False  # No FK detection or load order
+)
+```
+
+**Use Cases:**
+- **Database Migration**: Analyze entire schema and understand table dependencies
+- **Data Warehouse ETL**: Generate contracts for all source tables with correct load order
+- **Schema Documentation**: Document relationships and dependencies across tables
+- **Incremental Loading**: Use load_order to load dependent tables after their parents
 
 ## Contract Types
 
