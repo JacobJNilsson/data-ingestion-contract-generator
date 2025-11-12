@@ -2,7 +2,7 @@
 name = "ingestion-contract-mcp"
 version = "0.1.0"
 description = "MCP server for generating data ingestion contracts"
-readme = "mcp_server/README.md"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",
