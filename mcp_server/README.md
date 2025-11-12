@@ -49,12 +49,64 @@ Add to `.cursor/mcp.json`:
    - Maps source to destination with transformation rules
    - Returns: JSON contract with `contract_type: "transformation"`
 
+### Database Discovery
+
+5. **list_database_tables** - List all tables in a database with metadata
+   - Returns table names, row counts, column counts, and primary key information
+   - Helps discover available tables before generating contracts
+
 ### Analysis & Validation
 
-5. **analyze_source** - Analyze a source file and return raw metadata
-6. **validate_contract** - Validate any contract type (source, destination, or transformation)
+6. **analyze_source** - Analyze a source file and return raw metadata
+7. **validate_contract** - Validate any contract type (source, destination, or transformation)
 
 ## Example Workflows
+
+### Discovering Database Tables
+
+```python
+# 1. List all tables in a database
+tables = list_database_tables(
+    connection_string="postgresql://user:pass@localhost:5432/mydb",
+    database_type="postgresql",
+    schema="public"
+)
+
+# Returns:
+# {
+#   "tables": [
+#     {
+#       "table_name": "users",
+#       "schema": "public",
+#       "type": "table",
+#       "has_primary_key": true,
+#       "primary_key_columns": ["id"],
+#       "row_count": 10000,
+#       "column_count": 8
+#     },
+#     {
+#       "table_name": "orders",
+#       "schema": "public",
+#       "type": "table",
+#       "has_primary_key": true,
+#       "primary_key_columns": ["order_id"],
+#       "row_count": 50000,
+#       "column_count": 12
+#     }
+#   ],
+#   "count": 2
+# }
+
+# 2. Then generate contracts for selected tables
+contract = generate_database_source_contract(
+    source_id="users_table",
+    connection_string="postgresql://user:pass@localhost:5432/mydb",
+    database_type="postgresql",
+    source_type="table",
+    source_name="users",
+    schema="public"
+)
+```
 
 ### File-Based Source
 
