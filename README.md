@@ -70,7 +70,39 @@ uv sync
 make test
 ```
 
-### Using with Cursor
+### Command Line Interface (CLI)
+
+The `contract-gen` CLI provides direct access to contract generation and validation from the command line:
+
+```bash
+# Generate source contract from CSV
+uv run contract-gen source csv data/transactions.csv --id transactions --pretty
+
+# Save to file
+uv run contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json
+
+# Generate destination contract
+uv run contract-gen destination csv --id output_data --output contracts/destination.json --pretty
+
+# Validate contracts
+uv run contract-gen validate contracts/source.json
+uv run contract-gen validate contracts/ --recursive
+
+# Get help
+uv run contract-gen --help
+uv run contract-gen source --help
+```
+
+**Key features:**
+- Auto-detects CSV encoding and delimiters
+- Multiple output formats (JSON, YAML)
+- Pretty-printed output with syntax highlighting
+- Comprehensive validation with detailed error messages
+- Batch processing support
+
+See the [CLI documentation](cli/README.md) for more examples and options.
+
+### Using with Cursor (MCP Server)
 
 Add to your `.cursor/mcp.json`:
 
@@ -121,11 +153,29 @@ All code is fully typed with Python 3.13+ type hints. CI runs automatically on p
 - **[Git Workflow](.cursor/rules/git.mdc)** - Commit guidelines and workflow
 - **[Python Guidelines](.cursor/rules/python.mdc)** - Coding standards
 
+## Use Cases
+
+**Command Line / CI/CD:**
+- Generate contracts from scripts and pipelines
+- Validate contracts before deployment
+- Integrate with GitHub Actions or GitLab CI
+
+**Interactive Development:**
+- Use the MCP server with Cursor for AI-assisted contract generation
+- Real-time validation and schema analysis
+
+**Data Engineering:**
+- Document data sources automatically
+- Track schema changes over time
+- Ensure data quality across pipelines
+
 ## Requirements
 
 - **Python**: 3.13+
 - **MCP**: 1.0.0+
 - **Pydantic**: 2.0.0+
+- **Typer**: 0.12.0+ (for CLI)
+- **Rich**: 13.0.0+ (for CLI pretty output)
 
 See `pyproject.toml` for complete dependency list.
 
