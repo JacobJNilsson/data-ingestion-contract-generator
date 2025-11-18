@@ -17,11 +17,11 @@ def source_csv(
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
     ),
-    output_format: str = typer.Option("json", "--format", "-f", help="Output format: json or yaml"),
+    output_format: str | None = typer.Option(None, "--format", "-f", help="Output format: json or yaml"),
     delimiter: str | None = typer.Option(None, "--delimiter", help="CSV delimiter (default: auto-detect)"),
     encoding: str | None = typer.Option(None, "--encoding", help="File encoding (default: auto-detect)"),
-    sample_size: int = typer.Option(1000, "--sample-size", help="Number of rows to sample for analysis"),
-    pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output"),
+    sample_size: int | None = typer.Option(None, "--sample-size", help="Number of rows to sample for analysis"),
+    pretty: bool | None = typer.Option(None, "--pretty", help="Pretty-print JSON output"),
 ) -> None:
     """Generate source contract from CSV file.
 
@@ -29,15 +29,33 @@ def source_csv(
         contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json --pretty
     """
     try:
+        # Load config for defaults
+        from cli.config import get_csv_defaults, get_output_defaults
+
+        csv_defaults = get_csv_defaults()
+        output_defaults = get_output_defaults()
+
+        # Apply defaults from config if not specified via CLI
+        if delimiter is None:
+            delimiter = csv_defaults.delimiter
+        if encoding is None:
+            encoding = csv_defaults.encoding
+        if sample_size is None:
+            sample_size = csv_defaults.sample_size
+        if output_format is None:
+            output_format = output_defaults.format
+        if pretty is None:
+            pretty = output_defaults.pretty
+
         # Build config
-        config: dict[str, str | int] = {"sample_size": sample_size}
+        config_dict: dict[str, str | int] = {"sample_size": sample_size}
         if delimiter:
-            config["delimiter"] = delimiter
+            config_dict["delimiter"] = delimiter
         if encoding:
-            config["encoding"] = encoding
+            config_dict["encoding"] = encoding
 
         # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config)
+        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True)

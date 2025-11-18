@@ -3,7 +3,7 @@
 import typer
 
 from cli import __version__
-from cli.commands import destination, source
+from cli.commands import config, destination, source
 from cli.commands.validate import validate
 
 # Create main app
@@ -17,6 +17,7 @@ app = typer.Typer(
 # Add subcommands
 app.add_typer(source.app, name="source")
 app.add_typer(destination.app, name="destination")
+app.add_typer(config.app, name="config")
 app.command(name="validate")(validate)
 
 
