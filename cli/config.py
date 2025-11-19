@@ -17,6 +17,13 @@ class CSVDefaults(BaseModel):
     sample_size: int = 1000
 
 
+class JSONDefaults(BaseModel):
+    """Default values for JSON operations."""
+
+    encoding: str = "utf-8"
+    sample_size: int = 1000
+
+
 class OutputDefaults(BaseModel):
     """Default values for output formatting."""
 
@@ -28,6 +35,7 @@ class Defaults(BaseModel):
     """Default values for all commands."""
 
     csv: CSVDefaults = Field(default_factory=CSVDefaults)
+    json_config: JSONDefaults = Field(default_factory=JSONDefaults, alias="json")
     output: OutputDefaults = Field(default_factory=OutputDefaults)
 
 
@@ -161,6 +169,21 @@ def get_csv_defaults(config: Config | None = None) -> CSVDefaults:
         config = load_config()
 
     return config.defaults.csv
+
+
+def get_json_defaults(config: Config | None = None) -> JSONDefaults:
+    """Get JSON default values from config.
+
+    Args:
+        config: Config object, or None to load from file
+
+    Returns:
+        JSON defaults
+    """
+    if config is None:
+        config = load_config()
+
+    return config.defaults.json_config
 
 
 def get_output_defaults(config: Config | None = None) -> OutputDefaults:
