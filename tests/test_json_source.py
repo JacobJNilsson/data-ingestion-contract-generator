@@ -87,10 +87,7 @@ def test_cli_source_json() -> None:
 
         output_path = Path(tmpdir) / "contract.json"
 
-        result = runner.invoke(
-            app,
-            ["json", str(json_path), "--id", "users", "--output", str(output_path)]
-        )
+        result = runner.invoke(app, ["json", str(json_path), "--id", "users", "--output", str(output_path)])
 
         assert result.exit_code == 0
         assert output_path.exists()

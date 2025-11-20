@@ -1,6 +1,5 @@
 """Configuration management commands."""
 
-
 import typer
 import yaml
 
