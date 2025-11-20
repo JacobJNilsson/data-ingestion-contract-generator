@@ -15,7 +15,7 @@ format-check:
 
 # Run mypy type checker
 mypy:
-	uv run python -m mypy .
+	uv run --with mypy --with types-PyYAML --with pytest-stub mypy .
 
 # Run tests
 test:
