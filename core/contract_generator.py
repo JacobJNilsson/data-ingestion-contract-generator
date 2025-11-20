@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from mcp_server.models import (
+from core.models import (
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
@@ -429,7 +429,7 @@ def generate_destination_contract(
         if not database_type:
             raise ValueError("database_type is required when connection_string is provided")
 
-        from mcp_server.database_analyzer import inspect_table_schema
+        from core.database_analyzer import inspect_table_schema
 
         try:
             db_schema = inspect_table_schema(
