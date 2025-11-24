@@ -84,6 +84,9 @@ def generate_destination_contract(
     table_name: str | None = None,
     database_type: str | None = None,
     database_schema: str | None = None,
+    schema_file: str | None = None,
+    endpoint: str | None = None,
+    http_method: str | None = None,
 ) -> DestinationContract:
     """Generate a destination contract describing a data destination
 
@@ -95,10 +98,16 @@ def generate_destination_contract(
         table_name: Database table name (optional)
         database_type: Database type - postgresql, mysql, or sqlite (required if connection_string provided)
         database_schema: Database schema name (optional, for databases that support schemas)
+        schema_file: Path to OpenAPI/Swagger schema file (optional, for API destinations)
+        endpoint: API endpoint path from schema (optional, required if schema_file provided)
+        http_method: HTTP method for API (optional, e.g., POST, PUT, PATCH)
 
     Returns:
         Destination contract model
     """
+    # Initialize metadata
+    metadata = config.copy() if config else {}
+
     # If database info is provided, inspect the table
     if connection_string and table_name:
         if not database_type:
@@ -123,6 +132,38 @@ def generate_destination_contract(
             if not schema:
                 raise ValueError(f"Failed to inspect database table: {e}") from e
 
+    # If API schema file is provided, introspect the schema
+    if schema_file and endpoint:
+        from pathlib import Path
+
+        from core.sources.api import extract_endpoint_schema, parse_openapi_schema
+
+        try:
+            schema_path = Path(schema_file)
+            openapi_spec = parse_openapi_schema(schema_path)
+            api_schema = extract_endpoint_schema(
+                openapi_spec,
+                endpoint=endpoint,
+                method=http_method or "POST",
+            )
+
+            # Store API metadata
+            metadata["destination_type"] = "api"
+            metadata["endpoint"] = endpoint
+            metadata["http_method"] = (http_method or "POST").upper()
+            metadata["schema_file"] = str(schema_file)
+
+            # Merge with provided schema if any (provided schema takes precedence)
+            if schema:
+                api_schema.update(schema)
+            schema = api_schema
+
+        except Exception as e:
+            # If introspection fails, we might still want to proceed if a schema was manually provided
+            # otherwise we re-raise
+            if not schema:
+                raise ValueError(f"Failed to introspect API schema: {e}") from e
+
     # Parse schema if provided, otherwise use defaults
     if schema:
         dest_schema = DestinationSchema(
@@ -136,7 +177,7 @@ def generate_destination_contract(
     return DestinationContract(
         destination_id=destination_id,
         schema=dest_schema,
-        metadata=config or {},
+        metadata=metadata,
     )
 
 
