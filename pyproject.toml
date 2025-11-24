@@ -60,10 +60,10 @@ ignore = [
 "cli/**/*.py" = ["B008"]  # Typer uses function calls in defaults
 
 [tool.ruff.lint.isort]
-known-first-party = ["mcp_server", "cli"]
+known-first-party = ["core", "mcp_server", "cli"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -85,7 +85,7 @@ disallow_untyped_decorators = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = "mcp_server.models"
+module = "core.models"
 # Pydantic models with aliases have dynamic __init__ signatures
 warn_return_any = false
 
@@ -95,7 +95,7 @@ module = "tests.*"
 disable_error_code = ["call-arg"]
 
 [[tool.mypy.overrides]]
-module = "mcp_server.contract_generator"
+module = "core.contract_generator"
 # Pydantic models with aliases
 disable_error_code = ["call-arg"]
 
