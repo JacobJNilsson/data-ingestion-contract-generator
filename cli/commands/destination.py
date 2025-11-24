@@ -93,3 +93,52 @@ def destination_database(
     except Exception as e:
         error_message(f"Failed to generate destination contract: {e}")
         raise typer.Exit(1) from e
+
+
+@app.command("api")
+def destination_api(
+    schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
+    endpoint: str = typer.Argument(..., help="API endpoint path (e.g. /users, /data)"),
+    destination_id: str = typer.Option(..., "--id", help="Unique identifier for this destination"),
+    method: str = typer.Option("POST", "--method", help="HTTP method (GET, POST, PUT, PATCH, DELETE)"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
+    ),
+    output_format: str | None = typer.Option(None, "--format", "-f", help="Output format: json or yaml"),
+    pretty: bool | None = typer.Option(None, "--pretty", help="Pretty-print JSON output"),
+) -> None:
+    """Generate destination contract from an OpenAPI/Swagger schema file.
+
+    Example:
+        contract-gen destination api openapi.json /users --id users_api --method POST --pretty
+    """
+    try:
+        # Load config for defaults
+        from cli.config import get_output_defaults
+
+        output_defaults = get_output_defaults()
+
+        # Apply defaults from config if not specified via CLI
+        if output_format is None:
+            output_format = output_defaults.format
+        if pretty is None:
+            pretty = output_defaults.pretty
+
+        # Generate contract
+        contract = generate_destination_contract(
+            destination_id=destination_id,
+            schema_file=str(schema_file),
+            endpoint=endpoint,
+            http_method=method.upper(),
+        )
+
+        # Output
+        contract_json = contract.model_dump_json(by_alias=True)
+        output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
+
+    except ValueError as e:
+        error_message(str(e), hint="Check your OpenAPI schema file and endpoint path")
+        raise typer.Exit(1) from e
+    except Exception as e:
+        error_message(f"Failed to generate destination contract: {e}")
+        raise typer.Exit(1) from e
