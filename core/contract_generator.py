@@ -43,37 +43,135 @@ def generate_source_analysis(source_path: str) -> dict[str, Any]:
     return analyze_csv_file(source_file)
 
 
-def generate_source_contract(source_path: str, source_id: str, config: dict[str, Any] | None = None) -> SourceContract:
-    """Generate a source contract describing a data source
+def generate_source_contract(
+    source_id: str,
+    source_type: str = "unknown",
+    source_path: str | None = None,
+    config: dict[str, Any] | None = None,
+    connection_string: str | None = None,
+    table_name: str | None = None,
+    schema_file: str | None = None,
+    endpoint: str | None = None,
+    http_method: str = "GET",
+) -> SourceContract:
+    """
+    Generate a source contract for a given source.
 
     Args:
-        source_path: Path to source data file
-        source_id: Unique identifier for this source (e.g., 'swedish_bank_csv')
-        config: Optional configuration dictionary
-
-    Returns:
-        Source contract model
+        source_id: Unique identifier for the source
+        source_type: Type of source (e.g. "postgresql", "api", "csv", "json")
+        source_path: Path to source file (for CSV/JSON)
+        config: Configuration dictionary (for CSV/JSON)
+        connection_string: Connection string for database sources
+        table_name: Table name for database sources
+        schema_file: Path to OpenAPI/Swagger schema file for API sources
+        endpoint: API endpoint path for API sources
+        http_method: HTTP method for API sources (default: GET)
     """
-    source_analysis = generate_source_analysis(source_path)
+    schema = SourceSchema(fields=[], data_types=[])
+    metadata: dict[str, Any] = {"source_type": source_type}
+    quality_metrics = QualityMetrics(
+        total_rows=0,
+        sample_data=[],
+        issues=[],
+    )
 
-    return SourceContract(
-        source_id=source_id,
-        source_path=str(source_path),
-        file_format=source_analysis.get("file_type", "unknown"),
-        encoding=source_analysis.get("encoding", "utf-8"),
-        delimiter=source_analysis.get("delimiter"),
-        has_header=source_analysis.get("has_header", True),
-        schema=SourceSchema(
+    if source_type == "api":
+        if not schema_file or not endpoint:
+            raise ValueError("schema_file and endpoint are required for API sources")
+
+        from pathlib import Path
+
+        from core.sources.api import extract_response_schema, parse_openapi_schema
+
+        openapi_spec = parse_openapi_schema(Path(schema_file))
+        api_schema = extract_response_schema(openapi_spec, endpoint, http_method)
+
+        schema = SourceSchema(
+            fields=list(api_schema["fields"]),
+            data_types=list(api_schema["types"]),
+        )
+        metadata.update(
+            {
+                "endpoint": endpoint,
+                "http_method": http_method,
+                "schema_file": schema_file,
+            }
+        )
+
+    elif connection_string and table_name:
+        from core.sources.database.introspection import analyze_database_table
+
+        analysis = analyze_database_table(connection_string, table_name, source_type)
+        schema = SourceSchema(
+            fields=list(analysis["fields"]),  # type: ignore[arg-type,call-overload]
+            data_types=list(analysis["types"]),  # type: ignore[arg-type,call-overload]
+        )
+        metadata.update(
+            {
+                "connection_string": connection_string,
+                "table_name": table_name,
+            }
+        )
+
+    elif source_path:
+        # CSV / JSON file analysis
+        source_analysis = generate_source_analysis(source_path)
+
+        schema = SourceSchema(
             fields=source_analysis.get("sample_fields", []),
             data_types=source_analysis.get("data_types", []),
-        ),
-        quality_metrics=QualityMetrics(
+        )
+
+        quality_metrics = QualityMetrics(
             total_rows=source_analysis.get("total_rows", 0),
             sample_data=source_analysis.get("sample_data", []),
             issues=source_analysis.get("issues", []),
-        ),
-        metadata=config or {},
-    )
+        )
+
+        metadata.update(config or {})
+        metadata.update(
+            {
+                "file_format": source_analysis.get("file_type", "unknown"),
+                "encoding": source_analysis.get("encoding", "utf-8"),
+                "delimiter": source_analysis.get("delimiter"),
+                "has_header": source_analysis.get("has_header", True),
+                "source_path": source_path,
+            }
+        )
+
+    # Extract top-level fields from metadata or analysis
+    contract_fields: dict[str, Any] = {
+        "source_id": source_id,
+        "schema": schema,
+        "quality_metrics": quality_metrics,
+        "metadata": metadata,
+    }
+
+    if source_type == "api":
+        # API specific fields are in metadata, nothing top-level to map except maybe source_type
+        pass
+    elif connection_string:
+        contract_fields.update(
+            {
+                # Actually source_type argument is 'postgresql', 'mysql' etc.
+                "database_type": source_type if source_type in ["postgresql", "mysql", "sqlite"] else None,
+                "source_type": "table",  # Defaulting to table for now
+                "source_name": table_name,
+            }
+        )
+    elif source_path and "file_format" in metadata:
+        contract_fields.update(
+            {
+                "source_path": source_path,
+                "file_format": metadata.get("file_format"),
+                "encoding": metadata.get("encoding"),
+                "delimiter": metadata.get("delimiter"),
+                "has_header": metadata.get("has_header"),
+            }
+        )
+
+    return SourceContract(**contract_fields)
 
 
 def generate_destination_contract(
