@@ -55,7 +55,12 @@ def source_csv(
             config_dict["encoding"] = encoding
 
         # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        contract = generate_source_contract(
+            source_id=source_id,
+            source_type="csv",
+            source_path=str(path.absolute()),
+            config=config_dict,
+        )
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True)
@@ -112,7 +117,12 @@ def source_json(
             config_dict["encoding"] = encoding
 
         # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        contract = generate_source_contract(
+            source_id=source_id,
+            source_type="json",
+            source_path=str(path.absolute()),
+            config=config_dict,
+        )
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True)
@@ -127,3 +137,41 @@ def source_json(
     except Exception as e:
         error_message(f"Failed to generate source contract: {e}")
         raise typer.Exit(1) from e
+
+
+@app.command(name="api")
+def source_api(
+    schema_file: Path = typer.Argument(
+        ...,
+        help="OpenAPI/Swagger schema file (JSON or YAML)",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    endpoint: str = typer.Argument(..., help="API endpoint path (e.g. /users, /data)"),
+    source_id: str = typer.Option(..., "--id", help="Unique identifier for this source"),
+    method: str = typer.Option("GET", "--method", help="HTTP method (GET, POST, PUT, PATCH, DELETE)"),
+    output: Path = typer.Option(None, "--output", "-o", help="Output file path (default: stdout)"),
+    format: str = typer.Option("json", "--format", "-f", help="Output format: json or yaml"),
+    pretty: bool = typer.Option(False, "--pretty", help="Pretty-print JSON output"),
+) -> None:
+    """
+    Generate source contract from an OpenAPI/Swagger schema file.
+
+    Example:
+        contract-gen source api openapi.json /users --id users_api --method GET --pretty
+    """
+    try:
+        contract = generate_source_contract(
+            source_id=source_id,
+            source_type="api",
+            schema_file=str(schema_file),
+            endpoint=endpoint,
+            http_method=method,
+        )
+        contract_json = contract.model_dump_json(by_alias=True)
+        output_contract(contract_json, output, format, pretty)
+    except Exception as e:
+        typer.echo(f"Error generating contract: {e}", err=True)
+        raise typer.Exit(code=1)
