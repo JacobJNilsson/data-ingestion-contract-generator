@@ -93,6 +93,69 @@ def extract_endpoint_schema(
     return _extract_fields_from_schema(schema, body_required)
 
 
+def extract_response_schema(openapi_spec: dict[str, Any], endpoint: str, method: str) -> dict[str, Any]:
+    """
+    Extract schema from an OpenAPI endpoint response.
+    Looks for the 200 OK response schema.
+    """
+    paths = openapi_spec.get("paths", {})
+    if endpoint not in paths:
+        raise ValueError(f"Endpoint '{endpoint}' not found in schema")
+
+    endpoint_spec = paths[endpoint]
+    if method.lower() not in endpoint_spec:
+        raise ValueError(f"Method '{method}' not found for endpoint '{endpoint}'")
+
+    operation = endpoint_spec[method.lower()]
+    responses = operation.get("responses", {})
+
+    # Look for success response (200)
+    success_response = responses.get("200") or responses.get(200)
+    if not success_response:
+        # Fallback to 'default' if present
+        success_response = responses.get("default")
+
+    if not success_response:
+        return {
+            "fields": [],
+            "types": [],
+            "constraints": {},
+        }
+
+    # Handle $ref in response itself
+    if "$ref" in success_response:
+        success_response = _resolve_ref(openapi_spec, success_response["$ref"])
+
+    schema = {}
+
+    # OpenAPI 3.0 format: content.application/json.schema
+    if "content" in success_response:
+        content = success_response["content"]
+        json_content = content.get("application/json", content.get("application/x-www-form-urlencoded", {}))
+        schema = json_content.get("schema", {})
+
+    # Swagger 2.0 format: schema
+    elif "schema" in success_response:
+        schema = success_response["schema"]
+
+    if not schema:
+        return {
+            "fields": [],
+            "types": [],
+            "constraints": {},
+        }
+
+    # Handle $ref in schema
+    if "$ref" in schema:
+        schema = _resolve_ref(openapi_spec, schema["$ref"])
+
+    # Extract fields and types from schema
+    # For responses, we treat all properties as "required" in the sense that
+    # if they are in the schema, we expect them to be potentially present.
+    # However, strictly speaking, the 'required' list in the schema dictates what MUST be there.
+    return _extract_fields_from_schema(schema, schema.get("required", []))
+
+
 def _resolve_ref(openapi_spec: dict[str, Any], ref: str) -> dict[str, Any]:
     """Resolve a $ref pointer in the OpenAPI spec.
 
@@ -199,7 +262,7 @@ def _map_json_type_to_contract_type(json_type: str, format_type: str | None = No
             "time": "time",
             "email": "email",
             "uri": "url",
-            "uuid": "uuid",
+            "uuid": "text",
             "int32": "integer",
             "int64": "bigint",
             "float": "float",
