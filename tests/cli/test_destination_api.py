@@ -12,7 +12,6 @@ runner = CliRunner()
 
 def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
     """Test generating destination contract from OpenAPI schema file."""
-    # Create a sample OpenAPI schema
     openapi_schema = {
         "openapi": "3.0.0",
         "info": {"title": "API", "version": "1.0.0"},
@@ -50,6 +49,7 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
         app,
         [
             "api",
+            "generate",
             str(schema_file),
             "/users",
             "--id",
@@ -65,33 +65,40 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
-    assert contract["destination_id"] == "users_api"
-    assert contract["metadata"]["destination_type"] == "api"
-    assert contract["metadata"]["endpoint"] == "/users"
-    assert contract["metadata"]["http_method"] == "POST"
 
-    # Check schema extraction
-    assert "name" in contract["schema"]["fields"]
-    assert "email" in contract["schema"]["fields"]
-    assert "age" in contract["schema"]["fields"]
-    assert "active" in contract["schema"]["fields"]
+    expected_contract = {
+        "contract_type": "destination",
+        "contract_version": "1.0",
+        "destination_id": "users_api",
+        "schema": {
+            "fields": ["name", "email", "age", "active"],
+            "types": ["text", "email", "integer", "boolean"],
+            "constraints": {
+                "name": ["REQUIRED", "MIN_LENGTH: 1", "MAX_LENGTH: 100"],
+                "email": ["REQUIRED"],
+                "age": ["REQUIRED", "MIN: 0", "MAX: 150"],
+                "active": ["REQUIRED"],
+            },
+        },
+        "metadata": {
+            "destination_type": "api",
+            "endpoint": "/users",
+            "http_method": "POST",
+            "schema_file": str(schema_file),
+        },
+        "validation_rules": {
+            "required_fields": [],
+            "unique_constraints": [],
+            "format_validation": {},
+            "data_range_checks": {},
+        },
+    }
 
-    # Check types
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("name")] == "text"
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("email")] == "email"
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("age")] == "integer"
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("active")] == "boolean"
-
-    # Check constraints
-    assert "REQUIRED" in contract["schema"]["constraints"]["name"]
-    assert "REQUIRED" in contract["schema"]["constraints"]["email"]
-    assert any("MIN_LENGTH: 1" in c for c in contract["schema"]["constraints"]["name"])
-    assert any("MIN: 0" in c for c in contract["schema"]["constraints"]["age"])
+    assert contract == expected_contract
 
 
 def test_destination_api_cli_with_yaml_schema(tmp_path: Path) -> None:
     """Test generating destination contract from YAML OpenAPI schema."""
-    # Create a sample OpenAPI schema in YAML
     yaml_content = """
 openapi: 3.0.0
 info:
@@ -122,6 +129,7 @@ paths:
         app,
         [
             "api",
+            "generate",
             str(schema_file),
             "/data",
             "--id",
@@ -135,13 +143,31 @@ paths:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
-    assert contract["destination_id"] == "data_api"
-    assert "id" in contract["schema"]["fields"]
-    assert "value" in contract["schema"]["fields"]
 
-    # Check UUID format mapping
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("id")] == "uuid"
-    assert contract["schema"]["types"][contract["schema"]["fields"].index("value")] == "float"
+    expected_contract = {
+        "contract_type": "destination",
+        "contract_version": "1.0",
+        "destination_id": "data_api",
+        "schema": {
+            "fields": ["id", "value"],
+            "types": ["uuid", "float"],
+            "constraints": {},
+        },
+        "metadata": {
+            "destination_type": "api",
+            "endpoint": "/data",
+            "http_method": "POST",
+            "schema_file": str(schema_file),
+        },
+        "validation_rules": {
+            "required_fields": [],
+            "unique_constraints": [],
+            "format_validation": {},
+            "data_range_checks": {},
+        },
+    }
+
+    assert contract == expected_contract
 
 
 def test_destination_api_cli_endpoint_not_found(tmp_path: Path) -> None:
@@ -159,6 +185,7 @@ def test_destination_api_cli_endpoint_not_found(tmp_path: Path) -> None:
         app,
         [
             "api",
+            "generate",
             str(schema_file),
             "/missing",
             "--id",
@@ -185,6 +212,7 @@ def test_destination_api_cli_method_not_found(tmp_path: Path) -> None:
         app,
         [
             "api",
+            "generate",
             str(schema_file),
             "/users",
             "--id",
@@ -196,3 +224,80 @@ def test_destination_api_cli_method_not_found(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "not found for endpoint" in result.stderr
+
+
+def test_destination_api_cli_list_text_output(tmp_path: Path) -> None:
+    """Test listing available endpoints in text format."""
+    openapi_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"get": {}, "post": {}},
+            "/products": {"get": {}},
+        },
+    }
+
+    schema_file = tmp_path / "openapi.json"
+    schema_file.write_text(json.dumps(openapi_schema))
+
+    result = runner.invoke(app, ["api", "list", str(schema_file)])
+
+    assert result.exit_code == 0, f"Command failed: {result.stderr}"
+    # Text output should contain these strings
+    assert "/users" in result.stdout
+    assert "/products" in result.stdout
+    assert "GET" in result.stdout
+    assert "POST" in result.stdout
+
+
+def test_destination_api_cli_list_json_output(tmp_path: Path) -> None:
+    """Test listing available endpoints in JSON format."""
+    openapi_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"get": {"summary": "Get users"}, "post": {"summary": "Create user"}},
+            "/products": {"get": {"summary": "List products"}},
+        },
+    }
+
+    schema_file = tmp_path / "openapi.json"
+    schema_file.write_text(json.dumps(openapi_schema))
+
+    result = runner.invoke(app, ["api", "list", str(schema_file), "--format", "json"])
+
+    assert result.exit_code == 0
+    output = json.loads(result.stdout)
+    output_sorted = sorted(output, key=lambda x: (x["path"], x["method"]))
+
+    expected = [
+        {"method": "GET", "path": "/products", "summary": "List products"},
+        {"method": "GET", "path": "/users", "summary": "Get users"},
+        {"method": "POST", "path": "/users", "summary": "Create user"},
+    ]
+
+    assert output_sorted == expected
+
+
+def test_destination_api_cli_list_filter_by_method(tmp_path: Path) -> None:
+    """Test filtering endpoint list by HTTP method."""
+    openapi_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"get": {"summary": "Get users"}, "post": {"summary": "Create user"}},
+            "/products": {"get": {"summary": "List products"}},
+        },
+    }
+
+    schema_file = tmp_path / "openapi.json"
+    schema_file.write_text(json.dumps(openapi_schema))
+
+    result = runner.invoke(app, ["api", "list", str(schema_file), "--method", "POST", "--format", "json"])
+
+    assert result.exit_code == 0
+    output = json.loads(result.stdout)
+
+    expected = [{"method": "POST", "path": "/users", "summary": "Create user"}]
+
+    assert output == expected
