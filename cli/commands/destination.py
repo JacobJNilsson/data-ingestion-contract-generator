@@ -201,13 +201,11 @@ def list_api_endpoints(
     try:
         import json
 
-        import yaml
-
         from core.sources.api.introspection import extract_endpoint_list
+        from core.sources.api.parser import parse_openapi_schema
 
-        # Load schema
-        with open(schema_file) as f:
-            spec = yaml.safe_load(f) if str(schema_file).endswith((".yaml", ".yml")) else json.load(f)
+        # Load schema using typed parser
+        spec = parse_openapi_schema(schema_file)
 
         endpoints = extract_endpoint_list(spec, with_fields=with_fields, method=method)
 
