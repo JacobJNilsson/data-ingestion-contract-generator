@@ -1,11 +1,12 @@
 """API endpoint schema introspection."""
 
-from openapi_pydantic import OpenAPI, Operation, PathItem, Reference, RequestBody, Schema
+from openapi_pydantic import OpenAPI, Operation, PathItem, Reference, RequestBody, Response, Schema
 from openapi_pydantic.v3.v3_0 import OpenAPI as OpenAPI30
 from openapi_pydantic.v3.v3_0 import Operation as Operation30
 from openapi_pydantic.v3.v3_0 import PathItem as PathItem30
 from openapi_pydantic.v3.v3_0 import Reference as Reference30
 from openapi_pydantic.v3.v3_0 import RequestBody as RequestBody30
+from openapi_pydantic.v3.v3_0 import Response as Response30
 from openapi_pydantic.v3.v3_0 import Schema as Schema30
 
 
@@ -14,7 +15,7 @@ def extract_endpoint_schema(
     endpoint: str,
     method: str = "POST",
 ) -> dict[str, list[str] | dict[str, list[str]]]:
-    """Extract schema for a specific API endpoint.
+    """Extract request body schema for a specific API endpoint.
 
     Args:
         openapi_spec: Parsed OpenAPI specification
@@ -60,6 +61,59 @@ def extract_endpoint_schema(
 
     # Extract fields and types from schema
     return _extract_fields_from_schema(schema_dict, body_required)
+
+
+def extract_response_schema(
+    openapi_spec: OpenAPI | OpenAPI30,
+    endpoint: str,
+    method: str = "GET",
+) -> dict[str, list[str] | dict[str, list[str]]]:
+    """Extract response schema for a specific API endpoint.
+
+    Args:
+        openapi_spec: Parsed OpenAPI specification
+        endpoint: API endpoint path (e.g., '/users', '/data')
+        method: HTTP method (GET, POST, PUT, PATCH, DELETE)
+
+    Returns:
+        Dictionary containing fields, types, and constraints
+
+    Raises:
+        ValueError: If endpoint or schema not found
+    """
+    method = method.upper()
+
+    # Get paths from OpenAPI spec
+    if not openapi_spec.paths:
+        raise ValueError("No paths found in OpenAPI specification")
+
+    if endpoint not in openapi_spec.paths:
+        available = list(openapi_spec.paths.keys())
+        raise ValueError(f"Endpoint '{endpoint}' not found in schema. Available endpoints: {available}")
+
+    # Get path item
+    path_item = openapi_spec.paths[endpoint]
+
+    # Get operation by method
+    operation = _get_operation(path_item, method)
+    if operation is None:
+        available_methods = _get_available_methods(path_item)
+        raise ValueError(
+            f"Method '{method}' not found for endpoint '{endpoint}'. Available methods: {available_methods}"
+        )
+
+    # Get response schema
+    schema_dict = _extract_response_body_schema(openapi_spec, operation)
+
+    if not schema_dict:
+        return {
+            "fields": [],
+            "types": [],
+            "constraints": {},
+        }
+
+    # Extract fields and types from schema (responses are not required by default)
+    return _extract_fields_from_schema(schema_dict, body_required=False)
 
 
 # Valid HTTP methods for OpenAPI PathItem
@@ -178,6 +232,53 @@ def _extract_request_body_schema(
 
     schema_dict = _get_content_schema(openapi_spec, json_content.media_type_schema)
     return schema_dict, request_body.required or False
+
+
+def _extract_response_body_schema(openapi_spec: OpenAPI | OpenAPI30, operation: Operation | Operation30) -> dict | None:
+    """Extract response body schema from operation.
+
+    Looks for a successful response (200, 201, 2xx, or default).
+
+    Args:
+        openapi_spec: Full OpenAPI specification
+        operation: Operation object
+
+    Returns:
+        Schema dictionary or None if not found
+    """
+    if not operation.responses:
+        return None
+
+    # Try to find a successful response in order of preference
+    # 200 -> 201 -> 2XX -> default
+    response_keys = ["200", "201", "2XX", "default"]
+    response: Response | Response30 | None = None
+
+    for key in response_keys:
+        if key in operation.responses:
+            response_raw = operation.responses[key]
+            # Handle references
+            if isinstance(response_raw, (Reference, Reference30)) and response_raw.ref:
+                resolved = _resolve_reference(openapi_spec, response_raw.ref)
+                if not isinstance(resolved, (Response, Response30)):
+                    raise ValueError(f"Expected Response, got {type(resolved)}")
+                response = resolved
+            elif isinstance(response_raw, (Response, Response30)):
+                response = response_raw
+            break
+
+    if not response:
+        return None
+
+    # Get content schema (typically application/json)
+    if not response.content:
+        return None
+
+    json_content = response.content.get("application/json")
+    if not json_content:
+        return None
+
+    return _get_content_schema(openapi_spec, json_content.media_type_schema)
 
 
 def _resolve_reference(

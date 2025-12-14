@@ -43,17 +43,83 @@ def generate_source_analysis(source_path: str) -> dict[str, Any]:
     return analyze_csv_file(source_file)
 
 
-def generate_source_contract(source_path: str, source_id: str, config: dict[str, Any] | None = None) -> SourceContract:
+def generate_source_contract(
+    source_id: str,
+    source_path: str | None = None,
+    config: dict[str, Any] | None = None,
+    schema_file: str | None = None,
+    endpoint: str | None = None,
+    http_method: str | None = None,
+) -> SourceContract:
     """Generate a source contract describing a data source
 
     Args:
-        source_path: Path to source data file
         source_id: Unique identifier for this source (e.g., 'swedish_bank_csv')
+        source_path: Path to source data file (for file-based sources)
         config: Optional configuration dictionary
+        schema_file: Path to OpenAPI/Swagger schema file (for API sources)
+        endpoint: API endpoint path from schema (required if schema_file provided)
+        http_method: HTTP method for API (e.g., GET, POST)
 
     Returns:
         Source contract model
     """
+    # Initialize metadata
+    metadata = config.copy() if config else {}
+
+    # Handle API sources
+    if schema_file and endpoint:
+        from core.sources.api import extract_response_schema, parse_openapi_schema
+
+        try:
+            schema_path = Path(schema_file)
+            openapi_spec = parse_openapi_schema(schema_path)
+            api_schema = extract_response_schema(
+                openapi_spec,
+                endpoint=endpoint,
+                method=http_method or "GET",
+            )
+
+            # Store API metadata
+            metadata["source_type"] = "api"
+            metadata["endpoint"] = endpoint
+            metadata["http_method"] = (http_method or "GET").upper()
+            metadata["schema_file"] = str(schema_file)
+
+            # Build source contract from API schema
+            # Extract fields and types (which are lists)
+            fields = api_schema.get("fields", [])
+            types = api_schema.get("types", [])
+
+            # Ensure they are lists (not dicts)
+            if not isinstance(fields, list):
+                fields = []
+            if not isinstance(types, list):
+                types = []
+
+            return SourceContract(
+                source_id=source_id,
+                source_path=f"api:{endpoint}",
+                file_format="api",
+                encoding="utf-8",
+                schema=SourceSchema(
+                    fields=fields,
+                    data_types=types,
+                ),
+                quality_metrics=QualityMetrics(
+                    total_rows=0,
+                    sample_data=[],
+                    issues=[],
+                ),
+                metadata=metadata,
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to introspect API schema: {e}") from e
+
+    # Handle file-based sources
+    if not source_path:
+        raise ValueError("Either source_path or both schema_file and endpoint must be provided")
+
     source_analysis = generate_source_analysis(source_path)
 
     return SourceContract(
@@ -72,7 +138,7 @@ def generate_source_contract(source_path: str, source_id: str, config: dict[str,
             sample_data=source_analysis.get("sample_data", []),
             issues=source_analysis.get("issues", []),
         ),
-        metadata=config or {},
+        metadata=metadata,
     )
 
 

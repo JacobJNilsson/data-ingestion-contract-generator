@@ -11,6 +11,8 @@ from core.sources.database.introspection import extract_table_list
 app = typer.Typer(help="Generate source contracts from data sources")
 database_app = typer.Typer(help="Generate source contracts from databases")
 app.add_typer(database_app, name="database")
+api_app = typer.Typer(help="Generate source contracts from API schemas")
+app.add_typer(api_app, name="api")
 
 
 @app.command("csv")
@@ -58,7 +60,7 @@ def source_csv(
             config_dict["encoding"] = encoding
 
         # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        contract = generate_source_contract(source_id=source_id, source_path=str(path.absolute()), config=config_dict)
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True)
@@ -115,7 +117,7 @@ def source_json(
             config_dict["encoding"] = encoding
 
         # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        contract = generate_source_contract(source_id=source_id, source_path=str(path.absolute()), config=config_dict)
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True)
@@ -129,6 +131,174 @@ def source_json(
         raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to generate source contract: {e}")
+        raise typer.Exit(1) from e
+
+
+@api_app.command("generate")
+def source_api(
+    schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
+    endpoint: str = typer.Argument(..., help="API endpoint path (e.g. /users, /data)"),
+    source_id: str = typer.Option(..., "--id", help="Unique identifier for this source"),
+    method: str = typer.Option("GET", "--method", help="HTTP method (GET, POST, PUT, PATCH, DELETE)"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
+    ),
+    output_format: str | None = typer.Option(None, "--format", "-f", help="Output format: json or yaml"),
+    pretty: bool | None = typer.Option(None, "--pretty", help="Pretty-print JSON output"),
+) -> None:
+    """Generate source contract from an OpenAPI/Swagger schema file.
+
+    Example:
+        contract-gen source api generate openapi.json /users --id users_api --method GET --pretty
+    """
+    try:
+        # Load config for defaults
+        from cli.config import get_output_defaults
+
+        output_defaults = get_output_defaults()
+
+        # Apply defaults from config if not specified via CLI
+        if output_format is None:
+            output_format = output_defaults.format
+        if pretty is None:
+            pretty = output_defaults.pretty
+
+        # Generate contract
+        contract = generate_source_contract(
+            source_id=source_id,
+            schema_file=str(schema_file),
+            endpoint=endpoint,
+            http_method=method.upper(),
+        )
+
+        # Output
+        contract_json = contract.model_dump_json(by_alias=True)
+        output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
+
+    except ValueError as e:
+        error_message(str(e), hint="Check your OpenAPI schema file and endpoint path")
+        raise typer.Exit(1) from e
+    except Exception as e:
+        error_message(f"Failed to generate source contract: {e}")
+        raise typer.Exit(1) from e
+
+
+def _format_endpoint_text(ep: dict, with_fields: bool) -> list[str]:
+    """Format a single endpoint for text output.
+
+    Args:
+        ep: Endpoint dictionary with method, path, fields, types, etc.
+        with_fields: Whether field details should be included
+
+    Returns:
+        List of formatted lines for this endpoint
+    """
+    lines = [f"  {ep['method']:<6} {ep['path']}"]
+
+    if not with_fields:
+        return lines
+
+    if "fields" in ep:
+        fields = ep.get("fields", [])
+        types = ep.get("types", [])
+
+        if fields:
+            lines.append("    Fields:")
+            for i, field in enumerate(fields):
+                field_type = types[i] if i < len(types) else "unknown"
+                lines.append(f"      - {field} ({field_type})")
+        else:
+            lines.append("    (No fields)")
+        lines.append("")
+    elif "error" in ep:
+        lines.append(f"    Error: {ep['error']}")
+        lines.append("")
+    else:
+        lines.append("    (No fields info)")
+        lines.append("")
+
+    return lines
+
+
+@api_app.command("list")
+def list_api_responses(
+    schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
+    with_fields: bool = typer.Option(False, "--with-fields", help="Include response body field details"),
+    method: str | None = typer.Option(None, "--method", help="Filter by HTTP method"),
+    output_format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
+) -> None:
+    """List available API response endpoints in an OpenAPI specification.
+
+    Example:
+        contract-gen source api list openapi.yaml --method GET
+    """
+    try:
+        import json
+
+        from core.sources.api.introspection import extract_response_schema
+        from core.sources.api.parser import parse_openapi_schema
+
+        # Load schema using typed parser
+        spec = parse_openapi_schema(schema_file)
+
+        # Build endpoint list
+        endpoints: list[dict[str, str | list[str] | dict[str, list[str]]]] = []
+
+        if not spec.paths:
+            if output_format == "json":
+                typer.echo(json.dumps([], indent=2))
+            else:
+                typer.echo("No endpoints found.")
+            return
+
+        for path, path_item in spec.paths.items():
+            if not path.startswith("/"):
+                continue
+
+            # Check all HTTP methods
+            for method_lower in ["get", "post", "put", "patch", "delete", "head", "options", "trace"]:
+                operation = getattr(path_item, method_lower, None)
+                if not operation:
+                    continue
+
+                op_method = method_lower.upper()
+
+                # Apply method filter if specified
+                if method and op_method != method.upper():
+                    continue
+
+                endpoint_info: dict[str, str | list[str] | dict[str, list[str]]] = {
+                    "method": op_method,
+                    "path": path,
+                    "summary": operation.summary or "",
+                }
+
+                if with_fields:
+                    try:
+                        schema = extract_response_schema(spec, path, op_method)
+                        endpoint_info["fields"] = schema["fields"]
+                        endpoint_info["types"] = schema["types"]
+                        endpoint_info["constraints"] = schema.get("constraints", {})
+                    except Exception:
+                        endpoint_info["error"] = "Failed to extract response schema"
+
+                endpoints.append(endpoint_info)
+
+        if output_format == "json":
+            typer.echo(json.dumps(endpoints, indent=2))
+            return
+
+        if not endpoints:
+            typer.echo("No endpoints found.")
+            return
+
+        typer.echo(f"Endpoints ({len(endpoints)} total):")
+        for ep in endpoints:
+            for line in _format_endpoint_text(ep, with_fields):
+                typer.echo(line)
+
+    except Exception as e:
+        error_message(f"Failed to list endpoints: {e}")
         raise typer.Exit(1) from e
 
 
