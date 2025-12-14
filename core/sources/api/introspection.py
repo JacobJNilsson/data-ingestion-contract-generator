@@ -1,13 +1,19 @@
 """API endpoint schema introspection."""
 
-from typing import Any
+from openapi_pydantic import OpenAPI, Operation, PathItem, Reference, RequestBody, Schema
+from openapi_pydantic.v3.v3_0 import OpenAPI as OpenAPI30
+from openapi_pydantic.v3.v3_0 import Operation as Operation30
+from openapi_pydantic.v3.v3_0 import PathItem as PathItem30
+from openapi_pydantic.v3.v3_0 import Reference as Reference30
+from openapi_pydantic.v3.v3_0 import RequestBody as RequestBody30
+from openapi_pydantic.v3.v3_0 import Schema as Schema30
 
 
 def extract_endpoint_schema(
-    openapi_spec: dict[str, Any],
+    openapi_spec: OpenAPI | OpenAPI30,
     endpoint: str,
     method: str = "POST",
-) -> dict[str, Any]:
+) -> dict[str, list[str] | dict[str, list[str]]]:
     """Extract schema for a specific API endpoint.
 
     Args:
@@ -24,76 +30,159 @@ def extract_endpoint_schema(
     method = method.upper()
 
     # Get paths from OpenAPI spec
-    paths = openapi_spec.get("paths", {})
-    if endpoint not in paths:
-        available = list(paths.keys())
+    if not openapi_spec.paths:
+        raise ValueError("No paths found in OpenAPI specification")
+
+    if endpoint not in openapi_spec.paths:
+        available = list(openapi_spec.paths.keys())
         raise ValueError(f"Endpoint '{endpoint}' not found in schema. Available endpoints: {available}")
 
-    # Get method from endpoint
-    endpoint_spec = paths[endpoint]
-    if method.lower() not in endpoint_spec:
-        available_methods = [m.upper() for m in endpoint_spec if m != "parameters"]
+    # Get path item
+    path_item = openapi_spec.paths[endpoint]
+
+    # Get operation by method
+    operation = _get_operation(path_item, method)
+    if operation is None:
+        available_methods = _get_available_methods(path_item)
         raise ValueError(
             f"Method '{method}' not found for endpoint '{endpoint}'. Available methods: {available_methods}"
         )
 
     # Get request body schema
-    operation = endpoint_spec[method.lower()]
+    schema_dict, body_required = _extract_request_body_schema(openapi_spec, operation)
 
-    # Handle Swagger 2.0 format (parameters with in: body)
-    parameters = operation.get("parameters", [])
-    body_param = None
-    for param in parameters:
-        if isinstance(param, dict) and param.get("in") == "body":
-            body_param = param
-            break
-
-    if body_param:
-        # Swagger 2.0 format
-        schema = body_param.get("schema", {})
-        body_required = body_param.get("required", False)
-    else:
-        # OpenAPI 3.0 format
-        request_body = operation.get("requestBody", {})
-
-        if not request_body:
-            # No request body, return empty schema
-            return {
-                "fields": [],
-                "types": [],
-                "constraints": {},
-            }
-
-        # Get content schema (typically application/json)
-        content = request_body.get("content", {})
-        json_content = content.get("application/json", content.get("application/x-www-form-urlencoded", {}))
-
-        if not json_content:
-            return {
-                "fields": [],
-                "types": [],
-                "constraints": {},
-            }
-
-        schema = json_content.get("schema", {})
-        body_required = request_body.get("required", False)
-
-    if not schema:
+    if not schema_dict:
         return {
             "fields": [],
             "types": [],
             "constraints": {},
         }
 
-    # Handle $ref if present
-    if "$ref" in schema:
-        schema = _resolve_ref(openapi_spec, schema["$ref"])
-
     # Extract fields and types from schema
-    return _extract_fields_from_schema(schema, body_required)
+    return _extract_fields_from_schema(schema_dict, body_required)
 
 
-def _resolve_ref(openapi_spec: dict[str, Any], ref: str) -> dict[str, Any]:
+# Valid HTTP methods for OpenAPI PathItem
+_HTTP_METHODS: set[str] = {"get", "post", "put", "patch", "delete", "head", "options", "trace"}
+
+
+def _get_operation(path_item: PathItem | PathItem30, method: str) -> Operation | Operation30 | None:
+    """Get operation from path item by HTTP method.
+
+    Args:
+        path_item: PathItem object
+        method: HTTP method (uppercase)
+
+    Returns:
+        Operation object or None if not found
+    """
+    method_lower = method.lower()
+    if method_lower in _HTTP_METHODS:
+        return getattr(path_item, method_lower, None)
+    return None
+
+
+def _get_available_methods(path_item: PathItem | PathItem30) -> list[str]:
+    """Get list of available HTTP methods for a path item.
+
+    Args:
+        path_item: PathItem object
+
+    Returns:
+        List of available HTTP methods (uppercase)
+    """
+    methods = []
+    for method_lower in _HTTP_METHODS:
+        if getattr(path_item, method_lower, None):
+            methods.append(method_lower.upper())
+    return methods
+
+
+def _resolve_request_body(
+    openapi_spec: OpenAPI | OpenAPI30, request_body_raw: RequestBody | RequestBody30 | Reference | Reference30
+) -> RequestBody | RequestBody30:
+    """Resolve request body, handling references if needed.
+
+    Args:
+        openapi_spec: Full OpenAPI specification
+        request_body_raw: RequestBody or Reference
+
+    Returns:
+        Resolved RequestBody object
+
+    Raises:
+        ValueError: If reference cannot be resolved or type is unexpected
+    """
+    if isinstance(request_body_raw, (Reference, Reference30)):
+        resolved = _resolve_reference(openapi_spec, request_body_raw.ref)
+        if not isinstance(resolved, (RequestBody, RequestBody30)):
+            raise ValueError(f"Expected RequestBody, got {type(resolved)}")
+        return resolved
+    if isinstance(request_body_raw, (RequestBody, RequestBody30)):
+        return request_body_raw
+    raise ValueError(f"Unexpected requestBody type: {type(request_body_raw)}")
+
+
+def _get_content_schema(
+    openapi_spec: OpenAPI | OpenAPI30, media_type_schema: Schema | Schema30 | Reference | Reference30 | None
+) -> dict | None:
+    """Extract schema dictionary from media type schema.
+
+    Args:
+        openapi_spec: Full OpenAPI specification
+        media_type_schema: Schema, Reference, or None
+
+    Returns:
+        Schema as dictionary or None
+
+    Raises:
+        ValueError: If schema type is unexpected
+    """
+    if not media_type_schema:
+        return None
+
+    if isinstance(media_type_schema, (Reference, Reference30)):
+        return _resolve_schema_reference(openapi_spec, media_type_schema.ref)
+    if isinstance(media_type_schema, (Schema, Schema30)):
+        return _schema_to_dict(media_type_schema)
+    raise ValueError(f"Unexpected schema type: {type(media_type_schema)}")
+
+
+def _extract_request_body_schema(
+    openapi_spec: OpenAPI | OpenAPI30, operation: Operation | Operation30
+) -> tuple[dict | None, bool]:
+    """Extract request body schema from operation.
+
+    Args:
+        openapi_spec: Full OpenAPI specification
+        operation: Operation object
+
+    Returns:
+        Tuple of (schema_dict, body_required)
+    """
+    if not operation.requestBody:
+        return None, False
+
+    request_body = _resolve_request_body(openapi_spec, operation.requestBody)
+
+    if not request_body.content:
+        return None, request_body.required or False
+
+    # Get content schema (typically application/json)
+    json_content = request_body.content.get("application/json") or request_body.content.get(
+        "application/x-www-form-urlencoded"
+    )
+
+    if not json_content:
+        return None, request_body.required or False
+
+    schema_dict = _get_content_schema(openapi_spec, json_content.media_type_schema)
+    return schema_dict, request_body.required or False
+
+
+def _resolve_reference(
+    openapi_spec: OpenAPI | OpenAPI30, ref: str
+) -> RequestBody | RequestBody30 | Schema | Schema30 | object:
     """Resolve a $ref pointer in the OpenAPI spec.
 
     Args:
@@ -101,76 +190,162 @@ def _resolve_ref(openapi_spec: dict[str, Any], ref: str) -> dict[str, Any]:
         ref: Reference string (e.g., '#/components/schemas/User')
 
     Returns:
-        Resolved schema object
+        Resolved object (could be RequestBody, Schema, or other OpenAPI objects)
     """
     if not ref.startswith("#/"):
         raise ValueError(f"Only internal references are supported: {ref}")
 
     parts = ref[2:].split("/")
-    current = openapi_spec
+    current: object = openapi_spec
 
     for part in parts:
-        if part not in current:
+        if not hasattr(current, part):
             raise ValueError(f"Reference not found: {ref}")
-        current = current[part]
+        current = getattr(current, part)
 
     return current
 
 
-def _extract_fields_from_schema(schema: dict[str, Any], body_required: bool = False) -> dict[str, Any]:
+def _resolve_schema_reference(openapi_spec: OpenAPI | OpenAPI30, ref: str) -> dict:
+    """Resolve a schema $ref pointer in the OpenAPI spec.
+
+    Args:
+        openapi_spec: Full OpenAPI specification
+        ref: Reference string (e.g., '#/components/schemas/User')
+
+    Returns:
+        Resolved schema as dictionary
+    """
+    resolved = _resolve_reference(openapi_spec, ref)
+    if isinstance(resolved, Schema):
+        return _schema_to_dict(resolved)
+    if isinstance(resolved, dict):
+        return resolved
+    raise ValueError(f"Unexpected type for schema reference: {type(resolved)}")
+
+
+def _schema_to_dict(schema: Schema | Schema30) -> dict:
+    """Convert Schema object to dictionary.
+
+    Args:
+        schema: Schema object
+
+    Returns:
+        Schema as dictionary
+    """
+    # Use model_dump to convert to dict, using aliases for OpenAPI field names
+    return schema.model_dump(by_alias=True, exclude_none=True)
+
+
+def _extract_string_constraints(field_schema: dict) -> list[str]:
+    """Extract constraints for string type fields.
+
+    Args:
+        field_schema: Field schema dictionary
+
+    Returns:
+        List of constraint strings
+    """
+    constraints: list[str] = []
+    if "minLength" in field_schema:
+        constraints.append(f"MIN_LENGTH: {field_schema['minLength']}")
+    if "maxLength" in field_schema:
+        constraints.append(f"MAX_LENGTH: {field_schema['maxLength']}")
+    if "pattern" in field_schema:
+        constraints.append(f"PATTERN: {field_schema['pattern']}")
+    return constraints
+
+
+def _extract_numeric_constraints(field_schema: dict) -> list[str]:
+    """Extract constraints for integer/number type fields.
+
+    Args:
+        field_schema: Field schema dictionary
+
+    Returns:
+        List of constraint strings
+    """
+    constraints: list[str] = []
+    if "minimum" in field_schema:
+        min_val = field_schema["minimum"]
+        # Convert to int if it's a whole number, otherwise keep as float
+        if isinstance(min_val, float) and min_val.is_integer():
+            min_val = int(min_val)
+        constraints.append(f"MIN: {min_val}")
+    if "maximum" in field_schema:
+        max_val = field_schema["maximum"]
+        # Convert to int if it's a whole number, otherwise keep as float
+        if isinstance(max_val, float) and max_val.is_integer():
+            max_val = int(max_val)
+        constraints.append(f"MAX: {max_val}")
+    return constraints
+
+
+def _extract_field_constraints(
+    field_name: str, field_schema: dict, field_type: str, required_fields: set[str], body_required: bool
+) -> list[str]:
+    """Extract all constraints for a field.
+
+    Args:
+        field_name: Name of the field
+        field_schema: Field schema dictionary
+        field_type: JSON schema type of the field
+        required_fields: Set of required field names
+        body_required: Whether the request body itself is required
+
+    Returns:
+        List of constraint strings
+    """
+    constraints: list[str] = []
+
+    if field_name in required_fields or body_required:
+        constraints.append("REQUIRED")
+
+    if "enum" in field_schema:
+        enum_values = field_schema["enum"]
+        constraints.append(f"ENUM: {', '.join(map(str, enum_values))}")
+
+    if field_type == "string":
+        constraints.extend(_extract_string_constraints(field_schema))
+    elif field_type in ["integer", "number"]:
+        constraints.extend(_extract_numeric_constraints(field_schema))
+
+    return constraints
+
+
+def _extract_fields_from_schema(
+    schema: dict, body_required: bool = False
+) -> dict[str, list[str] | dict[str, list[str]]]:
     """Extract fields, types, and constraints from a JSON schema.
 
     Args:
-        schema: JSON schema object
+        schema: JSON schema object as dictionary
         body_required: Whether the request body itself is required
 
     Returns:
         Dictionary with fields, types, and constraints
     """
-    fields = []
-    types = []
+    fields: list[str] = []
+    types: list[str] = []
     constraints: dict[str, list[str]] = {}
 
-    # Get required fields
     required_fields = set(schema.get("required", []))
-
-    # Extract properties
     properties = schema.get("properties", {})
 
     for field_name, field_schema in properties.items():
+        if not isinstance(field_schema, dict):
+            continue
+
         fields.append(field_name)
 
-        # Map JSON schema type to contract type
         field_type = field_schema.get("type", "string")
         field_format = field_schema.get("format")
-
-        # Map type
         contract_type = _map_json_type_to_contract_type(field_type, field_format)
         types.append(contract_type)
 
-        # Extract constraints
-        field_constraints = []
-
-        if field_name in required_fields or body_required:
-            field_constraints.append("REQUIRED")
-
-        if "enum" in field_schema:
-            enum_values = field_schema["enum"]
-            field_constraints.append(f"ENUM: {', '.join(map(str, enum_values))}")
-
-        if field_type == "string":
-            if "minLength" in field_schema:
-                field_constraints.append(f"MIN_LENGTH: {field_schema['minLength']}")
-            if "maxLength" in field_schema:
-                field_constraints.append(f"MAX_LENGTH: {field_schema['maxLength']}")
-            if "pattern" in field_schema:
-                field_constraints.append(f"PATTERN: {field_schema['pattern']}")
-
-        if field_type in ["integer", "number"]:
-            if "minimum" in field_schema:
-                field_constraints.append(f"MIN: {field_schema['minimum']}")
-            if "maximum" in field_schema:
-                field_constraints.append(f"MAX: {field_schema['maximum']}")
+        field_constraints = _extract_field_constraints(
+            field_name, field_schema, field_type, required_fields, body_required
+        )
 
         if field_constraints:
             constraints[field_name] = field_constraints
@@ -227,12 +402,12 @@ def _is_valid_http_method(op_method: str) -> bool:
 
 
 def _build_endpoint_info(
-    openapi_spec: dict[str, Any],
+    openapi_spec: OpenAPI | OpenAPI30,
     path: str,
     op_method: str,
-    operation: dict[str, Any],
+    operation: Operation | Operation30,
     with_fields: bool,
-) -> dict[str, Any]:
+) -> dict[str, str | list[str] | dict[str, list[str]]]:
     """Build endpoint info dictionary for a single operation.
 
     Args:
@@ -245,10 +420,10 @@ def _build_endpoint_info(
     Returns:
         Endpoint info dictionary
     """
-    endpoint_info: dict[str, Any] = {
+    endpoint_info: dict[str, str | list[str] | dict[str, list[str]]] = {
         "method": op_method,
         "path": path,
-        "summary": operation.get("summary", ""),
+        "summary": operation.summary or "",
     }
 
     if with_fields:
@@ -263,11 +438,28 @@ def _build_endpoint_info(
     return endpoint_info
 
 
+def _get_path_operations(path_item: PathItem | PathItem30) -> list[tuple[str, Operation | Operation30]]:
+    """Get all operations from a path item.
+
+    Args:
+        path_item: PathItem object
+
+    Returns:
+        List of (method, operation) tuples
+    """
+    operations = []
+    for method_lower in _HTTP_METHODS:
+        operation = getattr(path_item, method_lower, None)
+        if operation:
+            operations.append((method_lower.upper(), operation))
+    return operations
+
+
 def extract_endpoint_list(
-    openapi_spec: dict[str, Any],
+    openapi_spec: OpenAPI | OpenAPI30,
     with_fields: bool = False,
     method: str | None = None,
-) -> list[dict[str, Any]]:
+) -> list[dict[str, str | list[str] | dict[str, list[str]]]]:
     """List API endpoints with optional field details.
 
     Args:
@@ -278,23 +470,23 @@ def extract_endpoint_list(
     Returns:
         List of endpoint details
     """
-    paths = openapi_spec.get("paths", {})
-    results = []
+    if not openapi_spec.paths:
+        return []
+
+    results: list[dict[str, str | list[str] | dict[str, list[str]]]] = []
     method_filter = method.upper() if method else None
 
-    for path, path_item in paths.items():
+    for path, path_item in openapi_spec.paths.items():
         if not path.startswith("/"):
             continue
 
-        for op_method, operation in path_item.items():
-            if not _is_valid_http_method(op_method):
+        operations = _get_path_operations(path_item)
+
+        for op_method, operation in operations:
+            if method_filter and op_method != method_filter:
                 continue
 
-            op_method_upper = op_method.upper()
-            if method_filter and op_method_upper != method_filter:
-                continue
-
-            endpoint_info = _build_endpoint_info(openapi_spec, path, op_method_upper, operation, with_fields)
+            endpoint_info = _build_endpoint_info(openapi_spec, path, op_method, operation, with_fields)
             results.append(endpoint_info)
 
     return results
