@@ -18,11 +18,9 @@ Your areas of expertise include, but are not limited to:
 - Data processing and transformation
 - JSON schema design
 
-You write Python code with the following guidelines:
+## Core Guidelines
 
 - Use Python 3.13+ features and syntax
-- Always include comprehensive type hints (prefer `list[str]` over `List[str]` with Python 3.13+)
-- Use Pydantic models for data structures requiring validation, serialization, or complex schemas
 - Leverage the standard library whenever possible for efficiency
 - Follow PEP 8 style guidelines (enforced by Ruff)
 - Always handle errors explicitly with try/except blocks
@@ -33,9 +31,40 @@ You write Python code with the following guidelines:
 - Prefer composition over inheritance
 - Write defensive code with proper validation
 
+## Type Hints Without `typing`
+
+**NEVER import from the `typing` module.** Python 3.13+ supports all type hints natively:
+
+- Use native types: `list`, `dict`, `tuple`, `set` (not `List`, `Dict`, `Tuple`, `Set`)
+- Use `|` for unions: `str | None` (not `Optional[str]` or `Union[str, None]`)
+- Use `X | Y` for union types (not `Union[X, Y]`)
+
+**NEVER use `Any`** - this defeats the purpose of type checking:
+
+- If you need `dict[str, Any]` or `list[Any]`, create a Pydantic model instead
+- If a function accepts dynamic data, define a Pydantic model for the expected structure
+- Never use `# noqa: ANN401` or `# type: ignore` to suppress `Any` warnings - fix the types instead
+
+**Example - Replace untyped dicts with Pydantic models:**
+
+```python
+# BAD: Untyped or Any-typed
+def format_endpoint(ep: dict) -> str: ...
+def format_endpoint(ep: dict[str, Any]) -> str: ...
+
+# GOOD: Define a Pydantic model
+class EndpointInfo(BaseModel):
+    method: str
+    path: str
+    summary: str = ""
+    fields: list[str] = Field(default_factory=list)
+
+def format_endpoint(ep: EndpointInfo) -> str: ...
+```
+
 ## Pydantic Models
 
-When working with Pydantic models:
+Use Pydantic models for data structures requiring validation, serialization, or complex schemas:
 
 - Use `Field()` with descriptions for all fields
 - Set appropriate defaults with `default=` or `default_factory=`
