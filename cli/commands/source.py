@@ -132,6 +132,34 @@ def source_json(
         raise typer.Exit(1) from e
 
 
+def _format_table_text(table: dict, with_fields: bool) -> list[str]:
+    """Format a single table for text output.
+
+    Args:
+        table: Table dictionary with name, columns, column_count, etc.
+        with_fields: Whether column details should be included
+
+    Returns:
+        List of formatted lines for this table
+    """
+    col_count = table.get("column_count", 0)
+    lines = [f"  {table['name']} ({col_count} columns)"]
+
+    if not with_fields:
+        return lines
+
+    if "columns" in table:
+        for col in table["columns"]:
+            nullable = ", NOT NULL" if not col["nullable"] else ""
+            lines.append(f"    - {col['name']} ({col['type']}{nullable})")
+        lines.append("")
+    elif "error" in table:
+        lines.append(f"    Error: {table['error']}")
+        lines.append("")
+
+    return lines
+
+
 @database_app.command("list")
 def source_database_list(
     connection_string: str = typer.Argument(
@@ -161,24 +189,18 @@ def source_database_list(
             import json
 
             typer.echo(json.dumps(tables, indent=2))
-        else:
-            if not tables:
-                typer.echo("No tables found.")
-                return
+            return
 
-            schema_msg = f" in schema '{schema}'" if schema else ""
-            typer.echo(f"Tables{schema_msg} ({len(tables)} total):")
+        if not tables:
+            typer.echo("No tables found.")
+            return
 
-            for table in tables:
-                col_count = table.get("column_count", 0)
-                typer.echo(f"  {table['name']} ({col_count} columns)")
+        schema_msg = f" in schema '{schema}'" if schema else ""
+        typer.echo(f"Tables{schema_msg} ({len(tables)} total):")
 
-                if with_fields and "columns" in table:
-                    for col in table["columns"]:
-                        pk = ", PRIMARY KEY" if False else ""  # Logic for PK display if available
-                        nullable = ", NOT NULL" if not col["nullable"] else ""
-                        typer.echo(f"    - {col['name']} ({col['type']}{nullable}{pk})")
-                    typer.echo("")
+        for table in tables:
+            for line in _format_table_text(table, with_fields):
+                typer.echo(line)
 
     except Exception as e:
         error_message(f"Failed to list tables: {e}")

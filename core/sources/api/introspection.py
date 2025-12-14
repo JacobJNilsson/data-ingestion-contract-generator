@@ -221,6 +221,48 @@ def _map_json_type_to_contract_type(json_type: str, format_type: str | None = No
     return type_mapping.get(json_type, "text")
 
 
+def _is_valid_http_method(op_method: str) -> bool:
+    """Check if the operation method is a valid HTTP method (not metadata)."""
+    return op_method.lower() not in ["parameters", "$ref", "summary", "description"]
+
+
+def _build_endpoint_info(
+    openapi_spec: dict[str, Any],
+    path: str,
+    op_method: str,
+    operation: dict[str, Any],
+    with_fields: bool,
+) -> dict[str, Any]:
+    """Build endpoint info dictionary for a single operation.
+
+    Args:
+        openapi_spec: Full OpenAPI specification (for schema extraction)
+        path: API endpoint path
+        op_method: HTTP method (uppercase)
+        operation: Operation object from the spec
+        with_fields: Whether to include field details
+
+    Returns:
+        Endpoint info dictionary
+    """
+    endpoint_info: dict[str, Any] = {
+        "method": op_method,
+        "path": path,
+        "summary": operation.get("summary", ""),
+    }
+
+    if with_fields:
+        try:
+            schema = extract_endpoint_schema(openapi_spec, path, op_method)
+            endpoint_info["fields"] = schema["fields"]
+            endpoint_info["types"] = schema["types"]
+            endpoint_info["constraints"] = schema["constraints"]
+        except Exception:
+            endpoint_info["error"] = "Failed to extract schema"
+
+    return endpoint_info
+
+
 def extract_endpoint_list(
     openapi_spec: dict[str, Any],
     with_fields: bool = False,
@@ -238,47 +280,21 @@ def extract_endpoint_list(
     """
     paths = openapi_spec.get("paths", {})
     results = []
-
-    if method:
-        method = method.upper()
+    method_filter = method.upper() if method else None
 
     for path, path_item in paths.items():
         if not path.startswith("/"):
             continue
 
         for op_method, operation in path_item.items():
-            if op_method.lower() in ["parameters", "$ref", "summary", "description"]:
+            if not _is_valid_http_method(op_method):
                 continue
 
             op_method_upper = op_method.upper()
-
-            if method and op_method_upper != method:
+            if method_filter and op_method_upper != method_filter:
                 continue
 
-            endpoint_info: dict[str, Any] = {
-                "method": op_method_upper,
-                "path": path,
-                "summary": operation.get("summary", ""),
-            }
-
-            if with_fields:
-                # Reuse extract_endpoint_schema logic partly or simplify
-                try:
-                    # We can use the existing function but we need to handle errors gracefully
-                    # and we don't want to fail if one endpoint is bad.
-                    # Also extract_endpoint_schema does full extraction.
-                    schema = extract_endpoint_schema(openapi_spec, path, op_method_upper)
-                    endpoint_info["fields"] = schema["fields"]
-                    endpoint_info["types"] = schema["types"]
-                    endpoint_info["constraints"] = schema["constraints"]
-                except Exception:
-                    endpoint_info["error"] = "Failed to extract schema"
-
-            # Count fields if not detailed
-            if not with_fields:
-                # Estimate count? Or leave it. The requirement says "names and basic info".
-                pass
-
+            endpoint_info = _build_endpoint_info(openapi_spec, path, op_method_upper, operation, with_fields)
             results.append(endpoint_info)
 
     return results

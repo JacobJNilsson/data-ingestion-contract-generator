@@ -284,6 +284,35 @@ def analyze_database_query(
         engine.dispose()
 
 
+def _get_table_column_info(inspector: Any, table_name: str, schema: str | None, with_fields: bool) -> dict[str, Any]:
+    """Get column information for a table.
+
+    Args:
+        inspector: SQLAlchemy inspector instance
+        table_name: Name of the table
+        schema: Database schema name
+        with_fields: Whether to include full column details
+
+    Returns:
+        Dictionary with column_count and optionally columns list
+    """
+    try:
+        columns = inspector.get_columns(table_name, schema=schema)
+        result: dict[str, Any] = {"column_count": len(columns)}
+        if with_fields:
+            result["columns"] = [
+                {
+                    "name": col["name"],
+                    "type": str(col["type"]),
+                    "nullable": col.get("nullable", True),
+                }
+                for col in columns
+            ]
+        return result
+    except Exception:
+        return {"column_count": 0, "error": "Failed to inspect columns"} if with_fields else {"column_count": 0}
+
+
 def extract_table_list(
     connection_string: str,
     database_type: str,
@@ -305,41 +334,12 @@ def extract_table_list(
 
     try:
         inspector = inspect(engine)
+        effective_schema = "public" if database_type == "postgresql" and schema is None else schema
+        table_names = inspector.get_table_names(schema=effective_schema)
 
-        if database_type == "postgresql" and schema is None:
-            schema = "public"
-
-        table_names = inspector.get_table_names(schema=schema)
-        results = []
-
-        for table_name in table_names:
-            table_info: dict[str, Any] = {"name": table_name}
-
-            if with_fields:
-                try:
-                    columns = inspector.get_columns(table_name, schema=schema)
-                    table_info["columns"] = [
-                        {
-                            "name": col["name"],
-                            "type": str(col["type"]),
-                            "nullable": col.get("nullable", True),
-                        }
-                        for col in columns
-                    ]
-                    table_info["column_count"] = len(columns)
-                except Exception:
-                    table_info["error"] = "Failed to inspect columns"
-                    table_info["column_count"] = 0
-            else:
-                try:
-                    columns = inspector.get_columns(table_name, schema=schema)
-                    table_info["column_count"] = len(columns)
-                except Exception:
-                    table_info["column_count"] = 0
-
-            results.append(table_info)
-
-        return results
-
+        return [
+            {"name": table_name, **_get_table_column_info(inspector, table_name, effective_schema, with_fields)}
+            for table_name in table_names
+        ]
     finally:
         engine.dispose()

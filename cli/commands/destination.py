@@ -149,6 +149,43 @@ def generate_api_contract(
         raise typer.Exit(1) from e
 
 
+def _format_endpoint_text(ep: dict, with_fields: bool) -> list[str]:
+    """Format a single endpoint for text output.
+
+    Args:
+        ep: Endpoint dictionary with method, path, fields, constraints, etc.
+        with_fields: Whether field details should be included
+
+    Returns:
+        List of formatted lines for this endpoint
+    """
+    lines = [f"  {ep['method']:<6} {ep['path']}"]
+
+    if not with_fields:
+        return lines
+
+    if "fields" in ep:
+        fields = ep.get("fields", [])
+        constraints = ep.get("constraints", {})
+
+        if fields:
+            lines.append("    Fields:")
+            for field in fields:
+                req = " (Required)" if "REQUIRED" in constraints.get(field, []) else ""
+                lines.append(f"      - {field}{req}")
+        else:
+            lines.append("    (No fields)")
+        lines.append("")
+    elif "error" in ep:
+        lines.append(f"    Error: {ep['error']}")
+        lines.append("")
+    else:
+        lines.append("    (No fields info)")
+        lines.append("")
+
+    return lines
+
+
 @api_app.command("list")
 def list_api_endpoints(
     schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
@@ -176,32 +213,16 @@ def list_api_endpoints(
 
         if output_format == "json":
             typer.echo(json.dumps(endpoints, indent=2))
-        else:
-            if not endpoints:
-                typer.echo("No endpoints found.")
-                return
+            return
 
-            typer.echo(f"Endpoints ({len(endpoints)} total):")
-            for ep in endpoints:
-                typer.echo(f"  {ep['method']:<6} {ep['path']}")
-                if with_fields and "fields" in ep:
-                    fields = ep.get("fields", [])
-                    constraints = ep.get("constraints", {})
+        if not endpoints:
+            typer.echo("No endpoints found.")
+            return
 
-                    if fields:
-                        typer.echo("    Fields:")
-                        for field in fields:
-                            req = " (Required)" if "REQUIRED" in constraints.get(field, []) else ""
-                            typer.echo(f"      - {field}{req}")
-                    else:
-                        typer.echo("    (No fields)")
-                    typer.echo("")
-                elif with_fields:
-                    if "error" in ep:
-                        typer.echo(f"    Error: {ep['error']}")
-                    else:
-                        typer.echo("    (No fields info)")
-                    typer.echo("")
+        typer.echo(f"Endpoints ({len(endpoints)} total):")
+        for ep in endpoints:
+            for line in _format_endpoint_text(ep, with_fields):
+                typer.echo(line)
 
     except Exception as e:
         error_message(f"Failed to list endpoints: {e}")
