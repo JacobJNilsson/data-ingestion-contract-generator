@@ -2,3 +2,7 @@
 __pycache__/
 .pytest_cache/
 .vscode/
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
