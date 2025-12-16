@@ -10,7 +10,7 @@ When a user asks you to:
 
 - "Create/Write a commit message" → Write the message text only, do NOT run `git commit`
 - "Make a commit" → Write a commit message and commit the relevant changes
-- "Prepare commits for a PR" → Create a commit for each logical change and then create a PR
+- "Prepare commits for a PR" → Create a commit for each logical change and then create a PR using `gh`
 
 ## Commit Message Format
 
@@ -85,6 +85,6 @@ Pydantic models for type safety, follows a stateless design returning JSON
 contracts, and includes comprehensive test coverage for data quality edge cases.
 ```
 
-## Fixing misstakes in the same PR
+## Fixing mistakes in the same PR
 
 Do not create a new fix commit for something that has not yet been merged to main, instead create a fixup commit and let the user rebase later.
