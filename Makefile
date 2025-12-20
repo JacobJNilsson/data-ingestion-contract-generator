@@ -1,4 +1,4 @@
-.PHONY: lint format format-check mypy test check
+.PHONY: lint format format-check mypy test check build clean release install-local
 
 # Run ruff linter
 lint:
@@ -23,3 +23,25 @@ test:
 
 # Run all checks
 check: lint format-check mypy
+
+# Packaging and distribution
+build:
+	@echo "Building package..."
+	uv build
+
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -rf dist/ build/ *.egg-info
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+release: check test clean build
+	@echo "All checks passed! Creating GitHub release..."
+	@VERSION=$$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2); \
+	echo "Version: $$VERSION"; \
+	gh release create "v$$VERSION" dist/*.whl dist/*.tar.gz \
+		--title "Release v$$VERSION" \
+		--generate-notes
+
+install-local: clean build
+	@echo "Installing locally with uv tool..."
+	uv tool install --force dist/*.whl

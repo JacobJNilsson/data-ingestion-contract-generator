@@ -5,6 +5,20 @@ description = "MCP server for generating data ingestion contracts"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
 requires-python = ">=3.13"
+authors = [
+    {name = "Jacob J. Nilsson", email = "jacobjnilsson@gmail.com"}
+]
+keywords = ["mcp", "data-ingestion", "contracts", "schema", "validation", "cli", "csv", "json", "database", "api", "openapi"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    "Topic :: Utilities",
+]
 dependencies = [
     "mcp>=1.0.0",
     "pydantic>=2.0.0",
@@ -16,6 +30,11 @@ dependencies = [
     "rich>=13.0.0",
     "pyyaml>=6.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/JacobJNilsson/data-ingestion-contract-generator"
+Repository = "https://github.com/JacobJNilsson/data-ingestion-contract-generator"
+Issues = "https://github.com/JacobJNilsson/data-ingestion-contract-generator/issues"
 
 [project.scripts]
 contract-gen = "cli.main:app"

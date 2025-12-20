@@ -1,6 +1,6 @@
 # Data Ingestion Contract Generator
 
-[![CI](https://github.com/JacobJNilsson/ingestion_contract_mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobJNilsson/ingestion_contract_mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/JacobJNilsson/data-ingestion-contract-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobJNilsson/data-ingestion-contract-generator/actions/workflows/ci.yml)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 An MCP (Model Context Protocol) server that automatically generates and validates contracts for data ingestion pipelines. Designed to help AI agents and developers build reliable, type-safe data workflows with automated schema detection and quality assessment.
@@ -59,9 +59,23 @@ See the [API documentation](core/README.md) for detailed usage and examples.
 ### Installation
 
 ```bash
+# Install with uv tool
+uv tool install https://github.com/JacobJNilsson/data-ingestion-contract-generator/releases/download/v0.1.0/ingestion_contract_mcp-0.1.0-py3-none-any.whl
+
+# Verify
+contract-gen --version
+```
+
+Download the latest release from [GitHub Releases](https://github.com/JacobJNilsson/data-ingestion-contract-generator/releases).
+
+> **Note:** Requires Python 3.13+ and [uv](https://github.com/astral-sh/uv) (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
+
+#### For Developers
+
+```bash
 # Clone the repository
-git clone <repository-url>
-cd ingestion_contract_mcp
+git clone https://github.com/JacobJNilsson/data-ingestion-contract-generator.git
+cd data-ingestion-contract-generator
 
 # Install dependencies
 uv sync
@@ -72,29 +86,22 @@ make test
 
 ### Command Line Interface (CLI)
 
-The `contract-gen` CLI provides direct access to contract generation and validation from the command line:
+The `contract-gen` CLI provides direct access to contract generation and validation.
+
+> **For local development:** Prefix commands with `uv run` (e.g., `uv run contract-gen --help`)
 
 ```bash
 # Generate source contract from CSV
-uv run contract-gen source csv data/transactions.csv --id transactions --pretty
-
-# Save to file
-uv run contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json
+contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json
 
 # Generate destination contract
-uv run contract-gen destination csv --id output_data --output contracts/destination.json --pretty
-
-# Generate API destination contract from OpenAPI schema
-uv run contract-gen destination api openapi.json /users --id users_api --method POST --pretty
+contract-gen destination csv --id output_data --output contracts/destination.json
 
 # Validate contracts
-uv run contract-gen validate contracts/source.json
-uv run contract-gen validate contracts/ --recursive
+contract-gen validate contracts/source.json
 
 # Get help
-uv run contract-gen --help
-uv run contract-gen source --help
-uv run contract-gen destination --help
+contract-gen --help
 ```
 
 **Key features:**
@@ -115,7 +122,7 @@ Add to your `.cursor/mcp.json`:
       "command": "uv",
       "args": [
         "--directory",
-        "/absolute/path/to/ingestion_contract_mcp",
+        "/absolute/path/to/data-ingestion-contract-generator",
         "run",
         "mcp_server/server.py"
       ]
