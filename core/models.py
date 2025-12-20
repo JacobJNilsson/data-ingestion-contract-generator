@@ -29,7 +29,7 @@ class SourceContract(BaseModel):
 
     contract_version: str = Field(default="1.0", description="Version of the contract schema")
     contract_type: Literal["source"] = Field(default="source", description="Type of contract")
-    source_id: str = Field(description="Unique identifier for this source")
+    source_id: str = Field(description="Unique identifier for this source (auto-generated if not provided)")
     # File-based sources
     source_path: str | None = Field(default=None, description="Path to the source data file")
     file_format: str | None = Field(default=None, description="File format (csv, json, parquet, etc.)")

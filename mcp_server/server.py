@@ -43,14 +43,14 @@ async def list_tools() -> list[Tool]:
                     },
                     "source_id": {
                         "type": "string",
-                        "description": "Unique identifier for this source (e.g., 'swedish_bank_csv')",
+                        "description": "Unique identifier for this source (e.g., 'swedish_bank_csv'). If not provided, will be auto-generated from the file name.",
                     },
                     "config": {
                         "type": "object",
                         "description": "Optional configuration/metadata dictionary",
                     },
                 },
-                "required": ["source_path", "source_id"],
+                "required": ["source_path"],
             },
         ),
         Tool(

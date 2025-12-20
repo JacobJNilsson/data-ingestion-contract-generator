@@ -43,18 +43,27 @@ def generate_source_analysis(source_path: str) -> dict[str, Any]:
     return analyze_csv_file(source_file)
 
 
-def generate_source_contract(source_path: str, source_id: str, config: dict[str, Any] | None = None) -> SourceContract:
+def generate_source_contract(
+    source_path: str, source_id: str | None = None, config: dict[str, Any] | None = None
+) -> SourceContract:
     """Generate a source contract describing a data source
 
     Args:
         source_path: Path to source data file
-        source_id: Unique identifier for this source (e.g., 'swedish_bank_csv')
+        source_id: Unique identifier for this source (e.g., 'swedish_bank_csv').
+                   If not provided, will be auto-generated from the file name.
         config: Optional configuration dictionary
 
     Returns:
         Source contract model
     """
     source_analysis = generate_source_analysis(source_path)
+
+    # Auto-generate source_id from file name if not provided
+    if source_id is None:
+        source_file = Path(source_path)
+        # Use stem (filename without extension) and sanitize it
+        source_id = source_file.stem.lower().replace(" ", "_").replace("-", "_")
 
     return SourceContract(
         source_id=source_id,
