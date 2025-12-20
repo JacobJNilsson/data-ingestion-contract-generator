@@ -20,11 +20,12 @@ from core.sources.csv import analyze_csv_file
 from core.sources.json import analyze_json_file
 
 
-def generate_source_analysis(source_path: str) -> dict[str, Any]:
+def generate_source_analysis(source_path: str, sample_size: int = 1000) -> dict[str, Any]:
     """Generate automated source data analysis
 
     Args:
         source_path: Path to source data file
+        sample_size: Number of rows to sample for analysis (default: 1000)
 
     Returns:
         Dictionary with analysis results
@@ -37,10 +38,10 @@ def generate_source_analysis(source_path: str) -> dict[str, Any]:
     # Determine file type by extension
     suffix = source_file.suffix.lower()
     if suffix in [".json", ".jsonl", ".ndjson"]:
-        return analyze_json_file(source_file)
+        return analyze_json_file(source_file, sample_size=sample_size)
 
     # Default to CSV analysis
-    return analyze_csv_file(source_file)
+    return analyze_csv_file(source_file, sample_size=sample_size)
 
 
 def generate_source_contract(
@@ -52,12 +53,15 @@ def generate_source_contract(
         source_path: Path to source data file
         source_id: Unique identifier for this source (e.g., 'swedish_bank_csv').
                    If not provided, will be auto-generated from the file name.
-        config: Optional configuration dictionary
+        config: Optional configuration dictionary (can include 'sample_size')
 
     Returns:
         Source contract model
     """
-    source_analysis = generate_source_analysis(source_path)
+    # Extract sample_size from config, default to 1000
+    sample_size = config.get("sample_size", 1000) if config else 1000
+
+    source_analysis = generate_source_analysis(source_path, sample_size=sample_size)
 
     # Auto-generate source_id from file name if not provided
     if source_id is None:

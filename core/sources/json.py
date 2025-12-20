@@ -7,8 +7,16 @@ from typing import Any
 from core.sources.utils import detect_data_types_from_multiple_rows, detect_file_encoding
 
 
-def analyze_json_file(source_file: Path) -> dict[str, Any]:
-    """Analyze JSON or NDJSON file content."""
+def analyze_json_file(source_file: Path, sample_size: int = 1000) -> dict[str, Any]:
+    """Analyze JSON or NDJSON file content.
+
+    Args:
+        source_file: Path to the JSON/NDJSON file
+        sample_size: Number of objects to sample for type detection (default: 1000)
+
+    Returns:
+        Dictionary with analysis results
+    """
     encoding = detect_file_encoding(str(source_file))
     issues = []
 
@@ -27,7 +35,7 @@ def analyze_json_file(source_file: Path) -> dict[str, Any]:
                 try:
                     data = json.load(f)
                     if isinstance(data, list):
-                        data_objects = data[:10]  # Sample first 10
+                        data_objects = data[:sample_size]  # Sample first N objects
                         total_rows = len(data)
                     else:
                         issues.append("JSON root is not a list")
@@ -40,7 +48,7 @@ def analyze_json_file(source_file: Path) -> dict[str, Any]:
                     line = line.strip()
                     if not line:
                         continue
-                    if i < 10:
+                    if len(data_objects) < sample_size:
                         try:
                             data_objects.append(json.loads(line))
                         except json.JSONDecodeError:

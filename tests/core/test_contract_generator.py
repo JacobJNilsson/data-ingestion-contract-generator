@@ -77,6 +77,30 @@ class TestSourceAnalysis:
         with pytest.raises(FileNotFoundError):
             generate_source_analysis("/nonexistent/file.csv")
 
+    def test_generate_source_analysis_sparse_columns(self, tmp_path: Path) -> None:
+        """Test that sparse columns are correctly typed with sufficient sample size"""
+        # Create a CSV with a column that's empty for first 10 rows but has values later
+        csv_file = tmp_path / "sparse_data.csv"
+        rows = ["date,amount,notes,sparse_result"]
+
+        # First 10 data rows - sparse_result is empty
+        for i in range(1, 11):
+            rows.append(f"2024-01-{i:02d},100.50,Transaction {i},")
+
+        # Row 11 onwards - sparse_result has values
+        for i in range(11, 16):
+            rows.append(f"2024-01-{i:02d},200.75,Transaction {i},15.{i}")
+
+        csv_file.write_text("\n".join(rows))
+
+        # Test with small sample size (should mark sparse_result as empty)
+        analysis_small = generate_source_analysis(str(csv_file), sample_size=10)
+        assert analysis_small["data_types"][3] == "empty"  # sparse_result column
+
+        # Test with larger sample size (should correctly detect sparse_result as numeric)
+        analysis_large = generate_source_analysis(str(csv_file), sample_size=20)
+        assert analysis_large["data_types"][3] == "numeric"  # sparse_result column
+
 
 class TestSourceContractGeneration:
     """Tests for source contract generation"""

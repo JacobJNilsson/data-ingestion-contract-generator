@@ -19,17 +19,26 @@ def detect_delimiter(file_path: str, encoding: str) -> str:
             return ","  # Default fallback
 
 
-def analyze_csv_file(source_file: Path) -> dict[str, Any]:
-    """Analyze CSV file content."""
+def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> dict[str, Any]:
+    """Analyze CSV file content.
+
+    Args:
+        source_file: Path to the CSV file
+        sample_size: Number of rows to sample for type detection (default: 1000)
+
+    Returns:
+        Dictionary with analysis results
+    """
     encoding = detect_file_encoding(str(source_file))
     delimiter = detect_delimiter(str(source_file), encoding)
 
-    # Read sample rows
+    # Read sample rows (header + sample_size data rows)
     sample_rows = []
+    max_rows_to_read = sample_size + 1  # +1 for header
     with source_file.open(encoding=encoding) as f:
         reader = csv.reader(f, delimiter=delimiter)
         for i, row in enumerate(reader):
-            if i >= 10:  # Sample first 10 rows
+            if i >= max_rows_to_read:
                 break
             sample_rows.append(row)
 
