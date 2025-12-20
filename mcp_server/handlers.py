@@ -89,14 +89,15 @@ class ContractHandler:
     def generate_source_contract(
         self,
         source_path: str,
-        source_id: str,
+        source_id: str | None = None,
         config: dict[str, object] | None = None,
     ) -> str:
         """Generate a source contract describing a data source
 
         Args:
             source_path: Absolute path to the source data file
-            source_id: Unique identifier for this source (e.g., 'swedish_bank_csv')
+            source_id: Unique identifier for this source (e.g., 'swedish_bank_csv').
+                       If not provided, will be auto-generated from the file name.
             config: Optional configuration dictionary
 
         Returns:

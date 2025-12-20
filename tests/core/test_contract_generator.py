@@ -115,6 +115,37 @@ class TestSourceContractGeneration:
 
         assert contract.metadata == {}
 
+    def test_generate_source_contract_auto_generated_id(self, sample_csv_path: Path) -> None:
+        """Test source contract generation with auto-generated source_id"""
+        contract = generate_source_contract(source_path=str(sample_csv_path))
+
+        # The sample_transactions.csv file should generate "sample_transactions" as source_id
+        assert contract.source_id == "sample_transactions"
+        assert contract.source_path == str(sample_csv_path)
+        assert contract.contract_type == "source"
+
+    def test_generate_source_contract_auto_generated_id_with_spaces(self, tmp_path: Path) -> None:
+        """Test source contract generation with auto-generated source_id for file with spaces"""
+        # Create a temporary CSV file with spaces in the name
+        test_file = tmp_path / "my test file.csv"
+        test_file.write_text("col1,col2\nval1,val2\n")
+
+        contract = generate_source_contract(source_path=str(test_file))
+
+        # Spaces should be converted to underscores
+        assert contract.source_id == "my_test_file"
+
+    def test_generate_source_contract_auto_generated_id_with_hyphens(self, tmp_path: Path) -> None:
+        """Test source contract generation with auto-generated source_id for file with hyphens"""
+        # Create a temporary CSV file with hyphens in the name
+        test_file = tmp_path / "my-test-file.csv"
+        test_file.write_text("col1,col2\nval1,val2\n")
+
+        contract = generate_source_contract(source_path=str(test_file))
+
+        # Hyphens should be converted to underscores
+        assert contract.source_id == "my_test_file"
+
 
 class TestDestinationContractGeneration:
     """Tests for destination contract generation"""

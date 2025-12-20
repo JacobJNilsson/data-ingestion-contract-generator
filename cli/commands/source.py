@@ -16,7 +16,9 @@ app.add_typer(database_app, name="database")
 @app.command("csv")
 def source_csv(
     path: Path = typer.Argument(..., help="Path to CSV file", exists=True, dir_okay=False, resolve_path=True),
-    source_id: str = typer.Option(..., "--id", help="Unique identifier for this source"),
+    source_id: str | None = typer.Option(
+        None, "--id", help="Unique identifier for this source (default: derived from file name)"
+    ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
     ),
@@ -29,6 +31,7 @@ def source_csv(
     """Generate source contract from CSV file.
 
     Example:
+        contract-gen source csv data/transactions.csv --output contracts/source.json --pretty
         contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json --pretty
     """
     try:
@@ -78,7 +81,9 @@ def source_csv(
 @app.command("json")
 def source_json(
     path: Path = typer.Argument(..., help="Path to JSON/NDJSON file", exists=True, dir_okay=False, resolve_path=True),
-    source_id: str = typer.Option(..., "--id", help="Unique identifier for this source"),
+    source_id: str | None = typer.Option(
+        None, "--id", help="Unique identifier for this source (default: derived from file name)"
+    ),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
     ),
@@ -90,6 +95,7 @@ def source_json(
     """Generate source contract from JSON or NDJSON file.
 
     Example:
+        contract-gen source json data/users.json --output contracts/source.json
         contract-gen source json data/users.json --id users --output contracts/source.json
     """
     try:

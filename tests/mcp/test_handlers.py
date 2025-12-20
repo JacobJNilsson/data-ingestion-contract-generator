@@ -77,12 +77,13 @@ class TestContractValidation:
         """Test that Pydantic catches missing required fields at construction"""
         from pydantic import ValidationError
 
-        # Missing required field
+        # Missing required fields (schema and quality_metrics are required)
         with pytest.raises(ValidationError):
             SourceContract(
-                # source_id is missing - should raise ValidationError
+                source_id="test",
                 source_path="/path/to/file.csv",
                 file_format="csv",
+                # schema and quality_metrics are missing - should raise ValidationError
             )
 
     def test_pydantic_validates_field_types(self) -> None:
@@ -97,7 +98,7 @@ class TestContractValidation:
                 source_id="test",
                 source_path="/path/to/file.csv",
                 file_format="csv",
-                data_schema=SourceSchema(fields=[], data_types=[]),
+                schema=SourceSchema(fields=[], data_types=[]),
                 quality_metrics=QualityMetrics(total_rows=-1),  # Invalid: negative
             )
 
@@ -118,6 +119,16 @@ class TestContractHandler:
         contract = json.loads(result)
         assert contract["contract_type"] == "source"
         assert contract["source_id"] == "test_source"
+        assert contract["file_format"] == "csv"
+
+    def test_generate_source_contract_auto_generated_id(self, handler: ContractHandler, sample_csv_path: Path) -> None:
+        """Test source contract generation with auto-generated source_id"""
+        result = handler.generate_source_contract(source_path=str(sample_csv_path))
+
+        # Result should be valid JSON with auto-generated source_id
+        contract = json.loads(result)
+        assert contract["contract_type"] == "source"
+        assert contract["source_id"] == "sample_transactions"
         assert contract["file_format"] == "csv"
 
     def test_generate_source_contract_relative_path(self, handler: ContractHandler) -> None:
