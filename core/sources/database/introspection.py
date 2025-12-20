@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy import MetaData, Table, inspect, select, text
 
-from core.models import QualityMetrics, SourceSchema
+from core.models import ColumnInfo, QualityMetrics, SourceSchema
 from core.sources.database.engine import create_database_engine
 from core.sources.database.type_mapping import map_database_type_to_contract_type
 
@@ -103,15 +103,15 @@ def analyze_database_table(
         }
 
         # Add column details
-        column_details = []
-        for col in columns:
-            col_info = {
-                "name": col["name"],
-                "type": str(col["type"]),
-                "nullable": col.get("nullable", True),
-                "default": str(col.get("default")) if col.get("default") is not None else None,
-            }
-            column_details.append(col_info)
+        column_details = [
+            ColumnInfo(
+                name=col["name"],
+                type=str(col["type"]),
+                nullable=col.get("nullable", True),
+                default=str(col.get("default")) if col.get("default") is not None else None,
+            )
+            for col in columns
+        ]
         table_metadata["columns"] = column_details
 
         return source_schema, quality_metrics, table_metadata
@@ -301,11 +301,11 @@ def _get_table_column_info(inspector: Any, table_name: str, schema: str | None, 
         result: dict[str, Any] = {"column_count": len(columns)}
         if with_fields:
             result["columns"] = [
-                {
-                    "name": col["name"],
-                    "type": str(col["type"]),
-                    "nullable": col.get("nullable", True),
-                }
+                ColumnInfo(
+                    name=col["name"],
+                    type=str(col["type"]),
+                    nullable=col.get("nullable", True),
+                )
                 for col in columns
             ]
         return result

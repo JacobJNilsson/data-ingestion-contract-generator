@@ -17,6 +17,15 @@ class NumericFormatInfo(BaseModel):
     format: Literal["european", "us"] = Field(description="Detected numeric format (european or us)")
 
 
+class ColumnInfo(BaseModel):
+    """Information about a database column"""
+
+    name: str = Field(description="Column name")
+    type: str = Field(description="Column data type")
+    nullable: bool = Field(description="Whether the column allows NULL values")
+    default: str | None = Field(default=None, description="Default value for the column")
+
+
 # ============================================================================
 # Source Contract Models
 # ============================================================================

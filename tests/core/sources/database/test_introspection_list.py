@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from core.models import ColumnInfo
 from core.sources.database.introspection import extract_table_list
 
 
@@ -56,16 +57,16 @@ def test_extract_table_list_with_fields(mock_inspect: MagicMock, mock_create_eng
             "name": "users",
             "column_count": 2,
             "columns": [
-                {"name": "id", "type": "INTEGER", "nullable": False},
-                {"name": "email", "type": "VARCHAR", "nullable": False},
+                ColumnInfo(name="id", type="INTEGER", nullable=False),
+                ColumnInfo(name="email", type="VARCHAR", nullable=False),
             ],
         },
         {
             "name": "orders",
             "column_count": 2,
             "columns": [
-                {"name": "id", "type": "INTEGER", "nullable": False},
-                {"name": "total", "type": "DECIMAL", "nullable": True},
+                ColumnInfo(name="id", type="INTEGER", nullable=False),
+                ColumnInfo(name="total", type="DECIMAL", nullable=True),
             ],
         },
     ]
