@@ -42,8 +42,8 @@ class TestFileDetection:
     def test_analyze_numeric_format_us(self) -> None:
         """Test US numeric format detection"""
         result = analyze_numeric_format("1,234.56")
-        assert result["format"] == "us"
-        assert result["has_thousands_sep"] is True
+        assert result.format == "us"
+        assert result.has_thousands_sep is True
 
     def test_analyze_numeric_format_european(self) -> None:
         """Test European numeric format detection"""
@@ -51,7 +51,7 @@ class TestFileDetection:
         # It needs a clearer European format like "1.234,56"
         result = analyze_numeric_format("1234,56")
         # Note: The current implementation has limited European format detection
-        assert result["has_comma_decimal"] is False  # Due to implementation logic
+        assert result.has_comma_decimal is False  # Due to implementation logic
 
 
 class TestSourceAnalysis:

@@ -1,7 +1,8 @@
 """Common utilities for source analysis."""
 
 from pathlib import Path
-from typing import Any
+
+from core.models import NumericFormatInfo
 
 
 def detect_file_encoding(file_path: str) -> str:
@@ -19,16 +20,16 @@ def detect_file_encoding(file_path: str) -> str:
     return "utf-8"  # Default fallback
 
 
-def analyze_numeric_format(sample_value: str) -> dict[str, Any]:
+def analyze_numeric_format(sample_value: str) -> NumericFormatInfo:
     """Analyze numeric format (e.g., European vs US format)"""
     has_comma_decimal = "," in sample_value.replace(",", "") and "." not in sample_value
     has_thousands_sep = "," in sample_value and "." in sample_value
 
-    return {
-        "has_comma_decimal": has_comma_decimal,
-        "has_thousands_sep": has_thousands_sep,
-        "format": "european" if has_comma_decimal else "us",
-    }
+    return NumericFormatInfo(
+        has_comma_decimal=has_comma_decimal,
+        has_thousands_sep=has_thousands_sep,
+        format="european" if has_comma_decimal else "us",
+    )
 
 
 def is_numeric(value: str) -> bool:

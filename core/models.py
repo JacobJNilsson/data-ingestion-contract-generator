@@ -5,6 +5,19 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 # ============================================================================
+# Utility Models
+# ============================================================================
+
+
+class NumericFormatInfo(BaseModel):
+    """Information about numeric format detected in data"""
+
+    has_comma_decimal: bool = Field(description="Whether the number uses comma as decimal separator")
+    has_thousands_sep: bool = Field(description="Whether the number uses thousands separator")
+    format: Literal["european", "us"] = Field(description="Detected numeric format (european or us)")
+
+
+# ============================================================================
 # Source Contract Models
 # ============================================================================
 
