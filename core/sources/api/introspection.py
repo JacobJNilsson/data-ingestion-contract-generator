@@ -8,12 +8,14 @@ from openapi_pydantic.v3.v3_0 import Reference as Reference30
 from openapi_pydantic.v3.v3_0 import RequestBody as RequestBody30
 from openapi_pydantic.v3.v3_0 import Schema as Schema30
 
+from core.models import EndpointInfo, SchemaInfo
+
 
 def extract_endpoint_schema(
     openapi_spec: OpenAPI | OpenAPI30,
     endpoint: str,
     method: str = "POST",
-) -> dict[str, list[str] | dict[str, list[str]]]:
+) -> SchemaInfo:
     """Extract schema for a specific API endpoint.
 
     Args:
@@ -52,14 +54,19 @@ def extract_endpoint_schema(
     schema_dict, body_required = _extract_request_body_schema(openapi_spec, operation)
 
     if not schema_dict:
-        return {
-            "fields": [],
-            "types": [],
-            "constraints": {},
-        }
+        return SchemaInfo(
+            fields=[],
+            types=[],
+            constraints={},
+        )
 
     # Extract fields and types from schema
-    return _extract_fields_from_schema(schema_dict, body_required)
+    data = _extract_fields_from_schema(schema_dict, body_required)
+    return SchemaInfo(
+        fields=data["fields"],  # type: ignore
+        types=data["types"],  # type: ignore
+        constraints=data["constraints"],  # type: ignore
+    )
 
 
 # Valid HTTP methods for OpenAPI PathItem
@@ -407,7 +414,7 @@ def _build_endpoint_info(
     op_method: str,
     operation: Operation | Operation30,
     with_fields: bool,
-) -> dict[str, str | list[str] | dict[str, list[str]]]:
+) -> EndpointInfo:
     """Build endpoint info dictionary for a single operation.
 
     Args:
@@ -420,7 +427,7 @@ def _build_endpoint_info(
     Returns:
         Endpoint info dictionary
     """
-    endpoint_info: dict[str, str | list[str] | dict[str, list[str]]] = {
+    endpoint_info: dict[str, object] = {
         "method": op_method,
         "path": path,
         "summary": operation.summary or "",
@@ -429,13 +436,13 @@ def _build_endpoint_info(
     if with_fields:
         try:
             schema = extract_endpoint_schema(openapi_spec, path, op_method)
-            endpoint_info["fields"] = schema["fields"]
-            endpoint_info["types"] = schema["types"]
-            endpoint_info["constraints"] = schema["constraints"]
+            endpoint_info["fields"] = schema.fields
+            endpoint_info["types"] = schema.types
+            endpoint_info["constraints"] = schema.constraints
         except Exception:
             endpoint_info["error"] = "Failed to extract schema"
 
-    return endpoint_info
+    return EndpointInfo.model_validate(endpoint_info)
 
 
 def _get_path_operations(path_item: PathItem | PathItem30) -> list[tuple[str, Operation | Operation30]]:
@@ -459,7 +466,7 @@ def extract_endpoint_list(
     openapi_spec: OpenAPI | OpenAPI30,
     with_fields: bool = False,
     method: str | None = None,
-) -> list[dict[str, str | list[str] | dict[str, list[str]]]]:
+) -> list[EndpointInfo]:
     """List API endpoints with optional field details.
 
     Args:
@@ -473,7 +480,7 @@ def extract_endpoint_list(
     if not openapi_spec.paths:
         return []
 
-    results: list[dict[str, str | list[str] | dict[str, list[str]]]] = []
+    results: list[EndpointInfo] = []
     method_filter = method.upper() if method else None
 
     for path, path_item in openapi_spec.paths.items():

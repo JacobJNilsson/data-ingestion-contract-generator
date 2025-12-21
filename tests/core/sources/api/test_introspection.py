@@ -21,7 +21,9 @@ def test_extract_endpoint_list_basic() -> None:
     result = extract_endpoint_list(spec)
 
     # Sort for consistent comparison (dict ordering may vary)
-    result_sorted = sorted(result, key=lambda x: (x["path"], x["method"]))
+    # Convert to dicts for comparison
+    result_dicts = [ep.model_dump(exclude_none=True) for ep in result]
+    result_sorted = sorted(result_dicts, key=lambda x: (x["path"], x["method"]))
 
     assert result_sorted == [
         {"method": "GET", "path": "/users", "summary": "Get users"},
@@ -44,7 +46,10 @@ def test_extract_endpoint_list_filter_by_method() -> None:
 
     result = extract_endpoint_list(spec, method="POST")
 
-    assert result == [
+    # Convert to dicts for comparison
+    result_dicts = [ep.model_dump(exclude_none=True) for ep in result]
+
+    assert result_dicts == [
         {"method": "POST", "path": "/users", "summary": "Create user"},
     ]
 
@@ -79,7 +84,10 @@ def test_extract_endpoint_list_with_fields() -> None:
 
     result = extract_endpoint_list(spec, with_fields=True, method="POST")
 
-    assert result == [
+    # Convert to dicts for comparison
+    result_dicts = [ep.model_dump(exclude_none=True) for ep in result]
+
+    assert result_dicts == [
         {
             "method": "POST",
             "path": "/users",

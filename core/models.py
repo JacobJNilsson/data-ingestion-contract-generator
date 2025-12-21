@@ -98,6 +98,20 @@ class SchemaInfo(BaseModel):
     )
 
 
+class EndpointInfo(BaseModel):
+    """Information about an API endpoint"""
+
+    method: str = Field(description="HTTP method")
+    path: str = Field(description="Endpoint path")
+    summary: str | None = Field(default=None, description="Endpoint summary/description")
+    fields: list[str] | None = Field(default=None, description="List of field names (if schema extracted)")
+    types: list[str] | None = Field(default=None, description="List of data types")
+    constraints: dict[str, list[str]] | None = Field(default=None, description="Field constraints")
+    error: str | None = Field(default=None, description="Error message if schema extraction failed")
+
+    model_config = {"populate_by_name": True}
+
+
 class SourceAnalysisResult(BaseModel):
     """Result of analyzing a data source file (CSV or JSON)"""
 

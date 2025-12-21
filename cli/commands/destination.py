@@ -209,8 +209,11 @@ def list_api_endpoints(
 
         endpoints = extract_endpoint_list(spec, with_fields=with_fields, method=method)
 
+        # Convert to dicts for output handling
+        endpoints_dicts = [ep.model_dump(exclude_none=True, by_alias=True) for ep in endpoints]
+
         if output_format == "json":
-            typer.echo(json.dumps(endpoints, indent=2))
+            typer.echo(json.dumps(endpoints_dicts, indent=2))
             return
 
         if not endpoints:
@@ -218,7 +221,7 @@ def list_api_endpoints(
             return
 
         typer.echo(f"Endpoints ({len(endpoints)} total):")
-        for ep in endpoints:
+        for ep in endpoints_dicts:
             for line in _format_endpoint_text(ep, with_fields):
                 typer.echo(line)
 
