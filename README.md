@@ -15,7 +15,7 @@ Building data ingestion pipelines is complex and error-prone, especially when de
 - Schema mismatches between source and destination
 - Transformation logic that's hard to track and maintain
 
-This MCP server solves these problems with a **three-contract architecture** that separates concerns and makes data pipelines explicit, validated, and maintainable.
+This MCP server solves these problems with a **three-contract architecture (version 2.0)** that separates concerns and makes data pipelines explicit, validated, and maintainable.
 
 ## Three-Contract Architecture
 
@@ -105,6 +105,7 @@ contract-gen --help
 ```
 
 **Key features:**
+
 - Auto-detects CSV encoding and delimiters
 - Multiple output formats (JSON, YAML)
 - Pretty-printed output with syntax highlighting
@@ -165,15 +166,18 @@ All code is fully typed with Python 3.13+ type hints. CI runs automatically on p
 ## Use Cases
 
 **Command Line / CI/CD:**
+
 - Generate contracts from scripts and pipelines
 - Validate contracts before deployment
 - Integrate with GitHub Actions or GitLab CI
 
 **Interactive Development:**
+
 - Use the MCP server with Cursor for AI-assisted contract generation
 - Real-time validation and schema analysis
 
 **Data Engineering:**
+
 - Document data sources automatically
 - Track schema changes over time
 - Ensure data quality across pipelines
