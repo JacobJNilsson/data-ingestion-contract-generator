@@ -8,7 +8,7 @@ from openapi_pydantic.v3.v3_0 import Reference as Reference30
 from openapi_pydantic.v3.v3_0 import RequestBody as RequestBody30
 from openapi_pydantic.v3.v3_0 import Schema as Schema30
 
-from core.models import EndpointInfo, SchemaInfo
+from core.models import EndpointInfo, FieldConstraint, FieldDefinition, SchemaInfo
 
 
 def extract_endpoint_schema(
@@ -54,19 +54,11 @@ def extract_endpoint_schema(
     schema_dict, body_required = _extract_request_body_schema(openapi_spec, operation)
 
     if not schema_dict:
-        return SchemaInfo(
-            fields=[],
-            types=[],
-            constraints={},
-        )
+        return SchemaInfo(fields=[])
 
     # Extract fields and types from schema
-    data = _extract_fields_from_schema(schema_dict, body_required)
-    return SchemaInfo(
-        fields=data["fields"],  # type: ignore
-        types=data["types"],  # type: ignore
-        constraints=data["constraints"],  # type: ignore
-    )
+    field_definitions = _extract_fields_from_schema(schema_dict, body_required)
+    return SchemaInfo(fields=field_definitions)
 
 
 # Valid HTTP methods for OpenAPI PathItem
@@ -244,73 +236,39 @@ def _schema_to_dict(schema: Schema | Schema30) -> dict:
     return schema.model_dump(by_alias=True, exclude_none=True)
 
 
-def _extract_string_constraints(field_schema: dict) -> list[str]:
-    """Extract constraints for string type fields.
-
-    Args:
-        field_schema: Field schema dictionary
-
-    Returns:
-        List of constraint strings
-    """
-    constraints: list[str] = []
+def _extract_string_constraints(field_schema: dict) -> list[FieldConstraint]:
+    """Extract constraints for string type fields."""
+    constraints: list[FieldConstraint] = []
     if "minLength" in field_schema:
-        constraints.append(f"MIN_LENGTH: {field_schema['minLength']}")
+        constraints.append(FieldConstraint(type="pattern", value=f"minLength: {field_schema['minLength']}"))
     if "maxLength" in field_schema:
-        constraints.append(f"MAX_LENGTH: {field_schema['maxLength']}")
+        constraints.append(FieldConstraint(type="pattern", value=f"maxLength: {field_schema['maxLength']}"))
     if "pattern" in field_schema:
-        constraints.append(f"PATTERN: {field_schema['pattern']}")
+        constraints.append(FieldConstraint(type="pattern", value=field_schema["pattern"]))
     return constraints
 
 
-def _extract_numeric_constraints(field_schema: dict) -> list[str]:
-    """Extract constraints for integer/number type fields.
-
-    Args:
-        field_schema: Field schema dictionary
-
-    Returns:
-        List of constraint strings
-    """
-    constraints: list[str] = []
+def _extract_numeric_constraints(field_schema: dict) -> list[FieldConstraint]:
+    """Extract constraints for integer/number type fields."""
+    constraints: list[FieldConstraint] = []
     if "minimum" in field_schema:
-        min_val = field_schema["minimum"]
-        # Convert to int if it's a whole number, otherwise keep as float
-        if isinstance(min_val, float) and min_val.is_integer():
-            min_val = int(min_val)
-        constraints.append(f"MIN: {min_val}")
+        constraints.append(FieldConstraint(type="range", min_value=field_schema["minimum"]))
     if "maximum" in field_schema:
-        max_val = field_schema["maximum"]
-        # Convert to int if it's a whole number, otherwise keep as float
-        if isinstance(max_val, float) and max_val.is_integer():
-            max_val = int(max_val)
-        constraints.append(f"MAX: {max_val}")
+        constraints.append(FieldConstraint(type="range", max_value=field_schema["maximum"]))
     return constraints
 
 
 def _extract_field_constraints(
     field_name: str, field_schema: dict, field_type: str, required_fields: set[str], body_required: bool
-) -> list[str]:
-    """Extract all constraints for a field.
-
-    Args:
-        field_name: Name of the field
-        field_schema: Field schema dictionary
-        field_type: JSON schema type of the field
-        required_fields: Set of required field names
-        body_required: Whether the request body itself is required
-
-    Returns:
-        List of constraint strings
-    """
-    constraints: list[str] = []
+) -> list[FieldConstraint]:
+    """Extract all constraints for a field."""
+    constraints: list[FieldConstraint] = []
 
     if field_name in required_fields or body_required:
-        constraints.append("REQUIRED")
+        constraints.append(FieldConstraint(type="not_null"))
 
     if "enum" in field_schema:
-        enum_values = field_schema["enum"]
-        constraints.append(f"ENUM: {', '.join(map(str, enum_values))}")
+        constraints.append(FieldConstraint(type="enum", value=field_schema["enum"]))
 
     if field_type == "string":
         constraints.extend(_extract_string_constraints(field_schema))
@@ -320,21 +278,9 @@ def _extract_field_constraints(
     return constraints
 
 
-def _extract_fields_from_schema(
-    schema: dict, body_required: bool = False
-) -> dict[str, list[str] | dict[str, list[str]]]:
-    """Extract fields, types, and constraints from a JSON schema.
-
-    Args:
-        schema: JSON schema object as dictionary
-        body_required: Whether the request body itself is required
-
-    Returns:
-        Dictionary with fields, types, and constraints
-    """
-    fields: list[str] = []
-    types: list[str] = []
-    constraints: dict[str, list[str]] = {}
+def _extract_fields_from_schema(schema: dict, body_required: bool = False) -> list[FieldDefinition]:
+    """Extract fields from a JSON schema into FieldDefinition objects."""
+    field_definitions: list[FieldDefinition] = []
 
     required_fields = set(schema.get("required", []))
     properties = schema.get("properties", {})
@@ -343,37 +289,31 @@ def _extract_fields_from_schema(
         if not isinstance(field_schema, dict):
             continue
 
-        fields.append(field_name)
-
         field_type = field_schema.get("type", "string")
         field_format = field_schema.get("format")
         contract_type = _map_json_type_to_contract_type(field_type, field_format)
-        types.append(contract_type)
 
         field_constraints = _extract_field_constraints(
             field_name, field_schema, field_type, required_fields, body_required
         )
 
-        if field_constraints:
-            constraints[field_name] = field_constraints
+        nullable = field_name not in required_fields and not body_required
 
-    return {
-        "fields": fields,
-        "types": types,
-        "constraints": constraints,
-    }
+        field_definitions.append(
+            FieldDefinition(
+                name=field_name,
+                data_type=contract_type,
+                nullable=nullable,
+                constraints=field_constraints,
+                description=field_schema.get("description"),
+            )
+        )
+
+    return field_definitions
 
 
 def _map_json_type_to_contract_type(json_type: str, format_type: str | None = None) -> str:
-    """Map JSON schema type to contract type.
-
-    Args:
-        json_type: JSON schema type
-        format_type: JSON schema format (e.g., 'date-time', 'email')
-
-    Returns:
-        Contract type string
-    """
+    """Map JSON schema type to contract type."""
     if format_type:
         format_mapping = {
             "date-time": "datetime",
@@ -415,19 +355,10 @@ def _build_endpoint_info(
     operation: Operation | Operation30,
     with_fields: bool,
 ) -> EndpointInfo:
-    """Build endpoint info dictionary for a single operation.
+    """Build endpoint info for a single operation."""
+    from typing import Any
 
-    Args:
-        openapi_spec: Full OpenAPI specification (for schema extraction)
-        path: API endpoint path
-        op_method: HTTP method (uppercase)
-        operation: Operation object from the spec
-        with_fields: Whether to include field details
-
-    Returns:
-        Endpoint info dictionary
-    """
-    endpoint_info: dict[str, object] = {
+    endpoint_info_dict: dict[str, Any] = {
         "method": op_method,
         "path": path,
         "summary": operation.summary or "",
@@ -435,14 +366,12 @@ def _build_endpoint_info(
 
     if with_fields:
         try:
-            schema = extract_endpoint_schema(openapi_spec, path, op_method)
-            endpoint_info["fields"] = schema.fields
-            endpoint_info["types"] = schema.types
-            endpoint_info["constraints"] = schema.constraints
+            schema_info = extract_endpoint_schema(openapi_spec, path, op_method)
+            endpoint_info_dict["fields"] = schema_info.fields
         except Exception:
-            endpoint_info["error"] = "Failed to extract schema"
+            endpoint_info_dict["error"] = "Failed to extract schema"
 
-    return EndpointInfo.model_validate(endpoint_info)
+    return EndpointInfo.model_validate(endpoint_info_dict)
 
 
 def _get_path_operations(path_item: PathItem | PathItem30) -> list[tuple[str, Operation | Operation30]]:

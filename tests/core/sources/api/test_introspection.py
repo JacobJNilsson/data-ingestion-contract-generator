@@ -26,9 +26,9 @@ def test_extract_endpoint_list_basic() -> None:
     result_sorted = sorted(result_dicts, key=lambda x: (x["path"], x["method"]))
 
     assert result_sorted == [
-        {"method": "GET", "path": "/users", "summary": "Get users"},
-        {"method": "POST", "path": "/users", "summary": "Create user"},
-        {"method": "GET", "path": "/users/{id}", "summary": "Get user"},
+        {"method": "GET", "path": "/users", "summary": "Get users", "fields": []},
+        {"method": "POST", "path": "/users", "summary": "Create user", "fields": []},
+        {"method": "GET", "path": "/users/{id}", "summary": "Get user", "fields": []},
     ]
 
 
@@ -50,7 +50,7 @@ def test_extract_endpoint_list_filter_by_method() -> None:
     result_dicts = [ep.model_dump(exclude_none=True) for ep in result]
 
     assert result_dicts == [
-        {"method": "POST", "path": "/users", "summary": "Create user"},
+        {"method": "POST", "path": "/users", "summary": "Create user", "fields": []},
     ]
 
 
@@ -84,16 +84,14 @@ def test_extract_endpoint_list_with_fields() -> None:
 
     result = extract_endpoint_list(spec, with_fields=True, method="POST")
 
-    # Convert to dicts for comparison
-    result_dicts = [ep.model_dump(exclude_none=True) for ep in result]
+    assert len(result) == 1
+    ep = result[0]
+    assert ep.method == "POST"
+    assert ep.path == "/users"
+    assert ep.summary == "Create user"
 
-    assert result_dicts == [
-        {
-            "method": "POST",
-            "path": "/users",
-            "summary": "Create user",
-            "fields": ["name", "email"],
-            "types": ["text", "email"],
-            "constraints": {},
-        },
-    ]
+    field_names = [f.name for f in ep.fields]
+    assert field_names == ["name", "email"]
+
+    field_types = [f.data_type for f in ep.fields]
+    assert field_types == ["text", "email"]
