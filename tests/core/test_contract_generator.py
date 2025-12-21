@@ -111,7 +111,7 @@ class TestSourceContractGeneration:
             source_path=str(sample_csv_path), source_id="test_transactions", config={"note": "test"}
         )
 
-        assert contract.contract_version == "1.0"
+        assert contract.contract_version == "2.0"
         assert contract.contract_type == "source"
         assert contract.source_id == "test_transactions"
         assert contract.source_path == str(sample_csv_path)
@@ -122,13 +122,14 @@ class TestSourceContractGeneration:
 
         # Check schema
         assert contract.data_schema.fields is not None
-        assert contract.data_schema.data_types is not None
         assert len(contract.data_schema.fields) == 5
+        assert all(f.profiling is not None for f in contract.data_schema.fields)
 
         # Check quality metrics
-        assert contract.quality_metrics.total_rows == 11  # Includes blank line at end of file
-        assert isinstance(contract.quality_metrics.sample_data, list)
-        assert contract.quality_metrics.issues == []
+        assert contract.quality.total_rows == 11  # Includes blank line at end of file
+        assert isinstance(contract.quality.sample_data, list)
+        assert contract.quality.issues == []
+        assert len(contract.quality.observed_profiling) == 5
 
         # Check metadata
         assert contract.metadata == {"note": "test"}
@@ -186,12 +187,12 @@ class TestDestinationContractGeneration:
             destination_id="test_dest", schema=schema, config={"database": "postgres"}
         )
 
-        assert contract.contract_version == "1.0"
+        assert contract.contract_version == "2.0"
         assert contract.contract_type == "destination"
         assert contract.destination_id == "test_dest"
-        assert contract.data_schema.fields == ["id", "date", "amount"]
-        assert contract.data_schema.types == ["uuid", "date", "decimal"]
-        assert contract.data_schema.constraints == {"id": "primary_key"}
+        assert len(contract.data_schema.fields) == 3
+        assert contract.data_schema.fields[0].name == "id"
+        assert contract.data_schema.fields[0].data_type == "uuid"
         assert contract.validation_rules.required_fields == []
         assert contract.metadata == {"database": "postgres"}
 
@@ -201,8 +202,6 @@ class TestDestinationContractGeneration:
 
         assert contract.contract_type == "destination"
         assert contract.data_schema.fields == []
-        assert contract.data_schema.types == []
-        assert contract.data_schema.constraints == {}
         assert contract.metadata == {}
 
 
@@ -218,16 +217,14 @@ class TestTransformationContractGeneration:
             config={"batch_size": 500, "error_threshold": 0.05},
         )
 
-        assert contract.contract_version == "1.0"
+        assert contract.contract_version == "2.0"
         assert contract.contract_type == "transformation"
         assert contract.transformation_id == "test_transform"
         assert contract.source_ref == "source_1"
         assert contract.destination_ref == "dest_1"
 
-        # Check empty mappings/transformations (to be filled by agent)
-        assert contract.field_mappings == {}
-        assert contract.transformations == {}
-        assert contract.enrichment == {}
+        # Check empty mappings (to be filled by agent)
+        assert contract.field_mappings == []
         assert contract.business_rules == []
 
         # Check execution plan with custom config
