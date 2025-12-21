@@ -363,18 +363,18 @@ def test_list_database_tables_basic(sqlite_db: str) -> None:
     assert len(tables) == 2  # users and orders
 
     # Find users table
-    users_table = next((t for t in tables if t["table_name"] == "users"), None)
+    users_table = next((t for t in tables if t.table_name == "users"), None)
     assert users_table is not None
-    assert users_table["type"] == "table"
-    assert users_table["has_primary_key"] is True
-    assert users_table["row_count"] == 3
-    assert users_table["column_count"] == 8
+    assert users_table.type == "table"
+    assert users_table.has_primary_key is True
+    assert users_table.row_count == 3
+    assert users_table.column_count == 8
 
     # Find orders table
-    orders_table = next((t for t in tables if t["table_name"] == "orders"), None)
+    orders_table = next((t for t in tables if t.table_name == "orders"), None)
     assert orders_table is not None
-    assert orders_table["type"] == "table"
-    assert orders_table["has_primary_key"] is True
+    assert orders_table.type == "table"
+    assert orders_table.has_primary_key is True
 
 
 def test_list_database_tables_without_row_counts(sqlite_db: str) -> None:
@@ -390,8 +390,8 @@ def test_list_database_tables_without_row_counts(sqlite_db: str) -> None:
 
     # Row counts should be None
     for table in tables:
-        assert table["row_count"] is None
-        assert table["column_count"] is not None
+        assert table.row_count is None
+        assert table.column_count is not None
 
 
 def test_list_database_tables_sorted(sqlite_db: str) -> None:
@@ -401,7 +401,7 @@ def test_list_database_tables_sorted(sqlite_db: str) -> None:
         database_type="sqlite",
     )
 
-    table_names = [t["table_name"] for t in tables]
+    table_names = [t.table_name for t in tables]
     assert table_names == sorted(table_names)
 
 
@@ -444,11 +444,10 @@ def test_list_database_tables_primary_key_info(sqlite_db: str) -> None:
         database_type="sqlite",
     )
 
-    users_table = next((t for t in tables if t["table_name"] == "users"), None)
+    users_table = next((t for t in tables if t.table_name == "users"), None)
     assert users_table is not None
-    assert users_table["has_primary_key"] is True
-    assert "primary_key_columns" in users_table
-    assert "id" in users_table["primary_key_columns"]
+    assert users_table.has_primary_key is True
+    assert "id" in users_table.primary_key_columns
 
 
 def test_list_database_tables_metadata_structure(sqlite_db: str) -> None:
@@ -459,20 +458,20 @@ def test_list_database_tables_metadata_structure(sqlite_db: str) -> None:
     )
 
     for table in tables:
-        # Required fields
-        assert "table_name" in table
-        assert "schema" in table
-        assert "type" in table
-        assert "has_primary_key" in table
-        assert "row_count" in table
-        assert "column_count" in table
+        # Required fields (check they exist as attributes)
+        assert hasattr(table, "table_name")
+        assert hasattr(table, "db_schema")
+        assert hasattr(table, "type")
+        assert hasattr(table, "has_primary_key")
+        assert hasattr(table, "row_count")
+        assert hasattr(table, "column_count")
 
         # Type checks
-        assert isinstance(table["table_name"], str)
-        assert isinstance(table["type"], str)
-        assert isinstance(table["has_primary_key"], bool)
-        assert isinstance(table["column_count"], (int, type(None)))
-        assert isinstance(table["row_count"], (int, type(None)))
+        assert isinstance(table.table_name, str)
+        assert isinstance(table.type, str)
+        assert isinstance(table.has_primary_key, bool)
+        assert isinstance(table.column_count, (int, type(None)))
+        assert isinstance(table.row_count, (int, type(None)))
 
 
 # ============================================================================

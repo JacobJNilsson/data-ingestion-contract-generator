@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import MetaData, Table, inspect, select, text
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, OperationalError
 
+from core.models import TableInfo
 from core.sources.database.engine import create_database_engine
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ def list_database_tables(
     schema: str | None = None,
     include_views: bool = False,
     include_row_counts: bool = True,
-) -> list[dict[str, Any]]:
+) -> list[TableInfo]:
     """List all tables in a database or schema with metadata.
 
     Args:
@@ -61,28 +62,28 @@ def list_database_tables(
 
         with engine.connect() as conn:
             for table_name, table_type in all_tables:
-                table_info: dict[str, Any] = {
-                    "table_name": table_name,
-                    "schema": schema,
-                    "type": table_type,
-                }
+                # Build table info fields
+                has_primary_key = False
+                primary_key_columns: list[str] = []
+                row_count: int | None = None
+                column_count: int | None = None
 
                 # Get primary key info
                 try:
                     pk_constraint = inspector.get_pk_constraint(table_name, schema=schema)
-                    table_info["has_primary_key"] = bool(pk_constraint.get("constrained_columns"))
-                    if table_info["has_primary_key"]:
-                        table_info["primary_key_columns"] = pk_constraint.get("constrained_columns", [])
+                    has_primary_key = bool(pk_constraint.get("constrained_columns"))
+                    if has_primary_key:
+                        primary_key_columns = pk_constraint.get("constrained_columns", [])
                 except NotImplementedError:
                     # Some databases/views don't support PK inspection
                     logger.debug(f"PK inspection not supported for {table_type} '{table_name}'")
-                    table_info["has_primary_key"] = False
+                    has_primary_key = False
                 except (NoSuchTableError, DatabaseError) as e:
                     logger.debug(f"Could not get PK info for '{table_name}': {e}")
-                    table_info["has_primary_key"] = False
+                    has_primary_key = False
                 except Exception as e:
                     logger.warning(f"Unexpected error getting PK for '{table_name}': {e}")
-                    table_info["has_primary_key"] = False
+                    has_primary_key = False
 
                 # Get row count if requested
                 if include_row_counts and table_type == "table":
@@ -90,31 +91,41 @@ def list_database_tables(
                         table = Table(table_name, metadata, autoload_with=engine, schema=schema)
                         count_query = select(text("COUNT(*)")).select_from(table)
                         result = conn.execute(count_query)
-                        table_info["row_count"] = result.scalar() or 0
+                        row_count = result.scalar() or 0
                     except (NoSuchTableError, DatabaseError, OperationalError) as e:
                         logger.debug(f"Could not count rows for '{table_name}': {e}")
-                        table_info["row_count"] = None
+                        row_count = None
                     except Exception as e:
                         logger.warning(f"Unexpected error counting rows for '{table_name}': {e}")
-                        table_info["row_count"] = None
+                        row_count = None
                 else:
-                    table_info["row_count"] = None
+                    row_count = None
 
                 # Get column count
                 try:
                     columns = inspector.get_columns(table_name, schema=schema)
-                    table_info["column_count"] = len(columns)
+                    column_count = len(columns)
                 except (NoSuchTableError, DatabaseError) as e:
                     logger.debug(f"Could not get column count for '{table_name}': {e}")
-                    table_info["column_count"] = None
+                    column_count = None
                 except Exception as e:
                     logger.warning(f"Unexpected error getting column count for '{table_name}': {e}")
-                    table_info["column_count"] = None
+                    column_count = None
 
+                # Create TableInfo object
+                table_info = TableInfo(
+                    table_name=table_name,
+                    schema=schema,  # Using alias name (populate_by_name=True allows this)
+                    type=table_type,
+                    has_primary_key=has_primary_key,
+                    primary_key_columns=primary_key_columns,
+                    row_count=row_count,
+                    column_count=column_count,
+                )
                 results.append(table_info)
 
         # Sort by table name
-        results.sort(key=lambda x: x["table_name"])
+        results.sort(key=lambda x: x.table_name)
 
         return results
 

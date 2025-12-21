@@ -130,7 +130,7 @@ def generate_database_multi_source_contracts(
             include_views=False,
             include_row_counts=False,
         )
-        tables = [t["table_name"] for t in table_list_result]
+        tables = [t.table_name for t in table_list_result]
 
     if not tables:
         return []
