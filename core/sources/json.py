@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 from core.models import SourceAnalysisResult
-from core.sources.utils import detect_data_types_from_multiple_rows, detect_file_encoding
+from core.sources.utils import (
+    detect_data_types_from_multiple_rows,
+    detect_file_encoding,
+    profile_field_data,
+)
 
 
 def analyze_json_file(source_file: Path, sample_size: int = 1000) -> SourceAnalysisResult:
@@ -91,12 +95,20 @@ def analyze_json_file(source_file: Path, sample_size: int = 1000) -> SourceAnaly
     num_columns = len(sample_fields)
     data_types = detect_data_types_from_multiple_rows(data_rows, num_columns) if data_rows else []
 
+    # Calculate field profiles
+    field_profiles = {}
+    if data_rows:
+        for i, field_name in enumerate(sample_fields):
+            column_data = [row[i] if i < len(row) else "" for row in data_rows]
+            field_profiles[field_name] = profile_field_data(column_data)
+
     return SourceAnalysisResult(
         file_type="ndjson" if is_ndjson else "json",
         encoding=encoding,
         delimiter=None,
         has_header=None,  # JSON doesn't have a header row like CSV
         total_rows=total_rows,
+        field_profiles=field_profiles,
         sample_fields=sample_fields,
         sample_data=data_rows[:5],
         data_types=data_types,
