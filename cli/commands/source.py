@@ -6,6 +6,7 @@ import typer
 
 from cli.output import error_message, output_contract
 from core.contract_generator import generate_source_contract
+from core.models import TableInfo
 from core.sources.database.relationships import list_database_tables
 
 app = typer.Typer(help="Generate source contracts from data sources")
@@ -138,30 +139,23 @@ def source_json(
         raise typer.Exit(1) from e
 
 
-def _format_table_text(table: dict, with_fields: bool) -> list[str]:
+def _format_table_text(table: TableInfo, with_fields: bool) -> list[str]:
     """Format a single table for text output.
 
     Args:
-        table: Table dictionary with name, columns, column_count, etc.
-        with_fields: Whether column details should be included
+        table: TableInfo object with table metadata
+        with_fields: Whether column details should be included (currently not supported)
 
     Returns:
         List of formatted lines for this table
     """
-    col_count = table.get("column_count", 0)
-    lines = [f"  {table['name']} ({col_count} columns)"]
+    col_count = table.column_count or 0
+    lines = [f"  {table.table_name} ({col_count} columns)"]
 
-    if not with_fields:
-        return lines
-
-    if "columns" in table:
-        for col in table["columns"]:
-            nullable = ", NOT NULL" if not col["nullable"] else ""
-            lines.append(f"    - {col['name']} ({col['type']}{nullable})")
-        lines.append("")
-    elif "error" in table:
-        lines.append(f"    Error: {table['error']}")
-        lines.append("")
+    if with_fields:
+        # Note: TableInfo doesn't include column details, so we can't show them
+        # This would require a different function or additional parameter
+        pass
 
     return lines
 
@@ -190,23 +184,23 @@ def source_database_list(
             schema=schema,
             include_views=True,
         )
-        # Convert to dicts for output handling
-        tables = [t.model_dump(exclude_none=True) for t in table_infos]
 
         if output_format == "json":
             import json
 
-            typer.echo(json.dumps(tables, indent=2))
+            # Convert to dicts for JSON output
+            tables_dict = [t.model_dump(exclude_none=True) for t in table_infos]
+            typer.echo(json.dumps(tables_dict, indent=2))
             return
 
-        if not tables:
+        if not table_infos:
             typer.echo("No tables found.")
             return
 
         schema_msg = f" in schema '{schema}'" if schema else ""
-        typer.echo(f"Tables{schema_msg} ({len(tables)} total):")
+        typer.echo(f"Tables{schema_msg} ({len(table_infos)} total):")
 
-        for table in tables:
+        for table in table_infos:
             for line in _format_table_text(table, with_fields):
                 typer.echo(line)
 
