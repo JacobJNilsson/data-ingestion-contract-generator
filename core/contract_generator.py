@@ -12,6 +12,7 @@ from core.models import (
     DestinationSchema,
     ExecutionPlan,
     QualityMetrics,
+    SourceAnalysisResult,
     SourceContract,
     SourceSchema,
     TransformationContract,
@@ -20,7 +21,7 @@ from core.sources.csv import analyze_csv_file
 from core.sources.json import analyze_json_file
 
 
-def generate_source_analysis(source_path: str, sample_size: int = 1000) -> dict[str, Any]:
+def generate_source_analysis(source_path: str, sample_size: int = 1000) -> SourceAnalysisResult:
     """Generate automated source data analysis
 
     Args:
@@ -72,18 +73,18 @@ def generate_source_contract(
     return SourceContract(
         source_id=source_id,
         source_path=str(source_path),
-        file_format=source_analysis.get("file_type", "unknown"),
-        encoding=source_analysis.get("encoding", "utf-8"),
-        delimiter=source_analysis.get("delimiter"),
-        has_header=source_analysis.get("has_header", True),
+        file_format=source_analysis.file_type,
+        encoding=source_analysis.encoding,
+        delimiter=source_analysis.delimiter,
+        has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
         schema=SourceSchema(
-            fields=source_analysis.get("sample_fields", []),
-            data_types=source_analysis.get("data_types", []),
+            fields=source_analysis.sample_fields,
+            data_types=source_analysis.data_types,
         ),
         quality_metrics=QualityMetrics(
-            total_rows=source_analysis.get("total_rows", 0),
-            sample_data=source_analysis.get("sample_data", []),
-            issues=source_analysis.get("issues", []),
+            total_rows=source_analysis.total_rows,
+            sample_data=source_analysis.sample_data,
+            issues=source_analysis.issues,
         ),
         metadata=config or {},
     )

@@ -24,15 +24,15 @@ def test_analyze_standard_json() -> None:
 
         analysis = generate_source_analysis(str(json_path))
 
-        assert analysis["file_type"] == "json"
-        assert analysis["total_rows"] == 2
-        assert analysis["sample_fields"] == ["active", "id", "name"]
+        assert analysis.file_type == "json"
+        assert analysis.total_rows == 2
+        assert analysis.sample_fields == ["active", "id", "name"]
         # Note: data types might vary based on detection logic, but we expect:
         # active -> text (or bool if supported, currently text/numeric/date/empty) -> actually bools are often detected as text unless specifically handled
         # id -> numeric
         # name -> text
-        assert "numeric" in analysis["data_types"]
-        assert "text" in analysis["data_types"]
+        assert "numeric" in analysis.data_types
+        assert "text" in analysis.data_types
 
 
 def test_analyze_ndjson() -> None:
@@ -49,9 +49,9 @@ def test_analyze_ndjson() -> None:
 
         analysis = generate_source_analysis(str(ndjson_path))
 
-        assert analysis["file_type"] == "ndjson"
-        assert analysis["total_rows"] == 3
-        assert analysis["sample_fields"] == ["id", "name", "score"]
+        assert analysis.file_type == "ndjson"
+        assert analysis.total_rows == 3
+        assert analysis.sample_fields == ["id", "name", "score"]
 
 
 def test_analyze_empty_json() -> None:
@@ -62,8 +62,8 @@ def test_analyze_empty_json() -> None:
 
         analysis = generate_source_analysis(str(json_path))
 
-        assert analysis["total_rows"] == 0
-        assert analysis["issues"] == ["File is empty or contains no valid objects"]
+        assert analysis.total_rows == 0
+        assert analysis.issues == ["File is empty or contains no valid objects"]
 
 
 def test_analyze_invalid_json() -> None:
@@ -74,8 +74,8 @@ def test_analyze_invalid_json() -> None:
 
         analysis = generate_source_analysis(str(json_path))
 
-        assert analysis["total_rows"] == 0
-        assert any("Invalid JSON" in issue for issue in analysis["issues"])
+        assert analysis.total_rows == 0
+        assert any("Invalid JSON" in issue for issue in analysis.issues)
 
 
 def test_cli_source_json() -> None:

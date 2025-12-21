@@ -28,8 +28,8 @@ class TestBOMHandling:
         analysis = generate_source_analysis(str(csv_file))
 
         # First field should be "Name" without BOM
-        assert analysis["sample_fields"][0] == "Name"
-        assert "\ufeff" not in analysis["sample_fields"][0]
+        assert analysis.sample_fields[0] == "Name"
+        assert "\ufeff" not in analysis.sample_fields[0]
 
     def test_strip_bom_from_source_contract(self, tmp_path: Path) -> None:
         """Source contract should not contain BOM in field names and should warn about it"""
@@ -99,7 +99,7 @@ class TestDataTypeDetection:
         csv_file.write_text(csv_content, encoding="utf-8")
 
         analysis = generate_source_analysis(str(csv_file))
-        types = analysis["data_types"]
+        types = analysis.data_types
 
         # All columns should be properly typed, not "empty"
         assert types[0] == "date", "Datum should be date"
@@ -144,9 +144,9 @@ class TestDateFormatDetection:
 
         analysis = generate_source_analysis(str(csv_file))
 
-        assert analysis["data_types"][0] == "date"
-        assert analysis["data_types"][1] == "text"
-        assert analysis["data_types"][2] == "numeric"
+        assert analysis.data_types[0] == "date"
+        assert analysis.data_types[1] == "text"
+        assert analysis.data_types[2] == "numeric"
 
 
 class TestAvanzaRealDataIssues:

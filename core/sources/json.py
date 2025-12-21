@@ -2,12 +2,12 @@
 
 import json
 from pathlib import Path
-from typing import Any
 
+from core.models import SourceAnalysisResult
 from core.sources.utils import detect_data_types_from_multiple_rows, detect_file_encoding
 
 
-def analyze_json_file(source_file: Path, sample_size: int = 1000) -> dict[str, Any]:
+def analyze_json_file(source_file: Path, sample_size: int = 1000) -> SourceAnalysisResult:
     """Analyze JSON or NDJSON file content.
 
     Args:
@@ -61,14 +61,16 @@ def analyze_json_file(source_file: Path, sample_size: int = 1000) -> dict[str, A
     if not data_objects:
         if not issues:
             issues.append("File is empty or contains no valid objects")
-        return {
-            "file_type": "ndjson" if is_ndjson else "json",
-            "encoding": encoding,
-            "total_rows": 0,
-            "sample_fields": [],
-            "data_types": [],
-            "issues": issues,
-        }
+        return SourceAnalysisResult(
+            file_type="ndjson" if is_ndjson else "json",
+            encoding=encoding,
+            delimiter=None,
+            has_header=None,
+            total_rows=0,
+            sample_fields=[],
+            data_types=[],
+            issues=issues,
+        )
 
     # Extract fields from all sampled objects to get a complete schema
     all_fields: set[str] = set()
@@ -89,13 +91,14 @@ def analyze_json_file(source_file: Path, sample_size: int = 1000) -> dict[str, A
     num_columns = len(sample_fields)
     data_types = detect_data_types_from_multiple_rows(data_rows, num_columns) if data_rows else []
 
-    return {
-        "file_type": "ndjson" if is_ndjson else "json",
-        "encoding": encoding,
-        "has_header": False,  # JSON doesn't have a header row like CSV
-        "total_rows": total_rows,
-        "sample_fields": sample_fields,
-        "sample_data": data_rows[:5],
-        "data_types": data_types,
-        "issues": issues,
-    }
+    return SourceAnalysisResult(
+        file_type="ndjson" if is_ndjson else "json",
+        encoding=encoding,
+        delimiter=None,
+        has_header=None,  # JSON doesn't have a header row like CSV
+        total_rows=total_rows,
+        sample_fields=sample_fields,
+        sample_data=data_rows[:5],
+        data_types=data_types,
+        issues=issues,
+    )

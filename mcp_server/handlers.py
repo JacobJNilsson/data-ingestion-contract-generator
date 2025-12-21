@@ -325,7 +325,7 @@ class ContractHandler:
 
         try:
             analysis = generate_source_analysis(str(source_full_path))
-            return json.dumps(analysis, indent=2)
+            return analysis.model_dump_json(indent=2)
         except (ValueError, OSError) as e:
             return json.dumps({"error": f"Failed to analyze source: {e!s}"}, indent=2)
 

@@ -2,8 +2,8 @@
 
 import csv
 from pathlib import Path
-from typing import Any
 
+from core.models import SourceAnalysisResult
 from core.sources.utils import detect_data_types_from_multiple_rows, detect_file_encoding
 
 
@@ -19,7 +19,7 @@ def detect_delimiter(file_path: str, encoding: str) -> str:
             return ","  # Default fallback
 
 
-def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> dict[str, Any]:
+def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> SourceAnalysisResult:
     """Analyze CSV file content.
 
     Args:
@@ -43,16 +43,16 @@ def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> dict[str, An
             sample_rows.append(row)
 
     if not sample_rows:
-        return {
-            "file_type": "csv",
-            "delimiter": delimiter,
-            "encoding": encoding,
-            "has_header": False,
-            "total_rows": 0,
-            "sample_fields": [],
-            "data_types": [],
-            "issues": ["File is empty"],
-        }
+        return SourceAnalysisResult(
+            file_type="csv",
+            delimiter=delimiter,
+            encoding=encoding,
+            has_header=False,
+            total_rows=0,
+            sample_fields=[],
+            data_types=[],
+            issues=["File is empty"],
+        )
 
     # Detect header (first row might be header)
     has_header = any(not cell.replace(".", "").replace("-", "").isdigit() for cell in sample_rows[0])
@@ -86,14 +86,14 @@ def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> dict[str, An
             "original file encoding correctly."
         )
 
-    return {
-        "file_type": "csv",
-        "delimiter": delimiter,
-        "encoding": encoding,
-        "has_header": has_header,
-        "total_rows": max(0, total_rows),
-        "sample_fields": sample_fields,
-        "sample_data": data_rows[:5] if data_rows else [],
-        "data_types": data_types,
-        "issues": issues,
-    }
+    return SourceAnalysisResult(
+        file_type="csv",
+        delimiter=delimiter,
+        encoding=encoding,
+        has_header=has_header,
+        total_rows=max(0, total_rows),
+        sample_fields=sample_fields,
+        sample_data=data_rows[:5] if data_rows else [],
+        data_types=data_types,
+        issues=issues,
+    )
