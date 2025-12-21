@@ -54,10 +54,14 @@ def test_destination_database_cli(tmp_path: Path) -> None:
 
     contract = json.loads(output_file.read_text())
     assert contract["destination_id"] == "products_dest"
-    assert contract["schema"]["fields"] == ["id", "name", "price"]
-    assert contract["schema"]["types"] == ["INTEGER", "TEXT", "REAL"]
-    assert contract["schema"]["constraints"]["id"] == ["PRIMARY KEY"]
-    assert contract["schema"]["constraints"]["name"] == ["NOT NULL"]
+
+    field_names = [f["name"] for f in contract["schema"]["fields"]]
+    assert field_names == ["id", "name", "price"]
+    field_types = [f["data_type"] for f in contract["schema"]["fields"]]
+    assert field_types == ["INTEGER", "TEXT", "REAL"]
+    field_constraints = {f["name"]: [c["type"] for c in f.get("constraints", [])] for f in contract["schema"]["fields"]}
+    assert "primary_key" in field_constraints["id"]
+    assert "not_null" in field_constraints["name"]
 
 
 def test_destination_database_cli_table_not_found(tmp_path: Path) -> None:

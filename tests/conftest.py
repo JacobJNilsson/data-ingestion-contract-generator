@@ -8,7 +8,9 @@ from core.models import (
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
-    QualityMetrics,
+    FieldDefinition,
+    FieldMapping,
+    QualityObservation,
     SourceContract,
     SourceSchema,
     TransformationContract,
@@ -44,11 +46,14 @@ def sample_source_contract() -> SourceContract:
         encoding="utf-8",
         delimiter=",",
         has_header=True,
-        data_schema=SourceSchema(
-            fields=["date", "amount", "description"],
-            data_types=["date", "numeric", "text"],
+        schema=SourceSchema(
+            fields=[
+                FieldDefinition(name="date", data_type="date"),
+                FieldDefinition(name="amount", data_type="numeric"),
+                FieldDefinition(name="description", data_type="text"),
+            ]
         ),
-        quality_metrics=QualityMetrics(
+        quality=QualityObservation(
             total_rows=100,
             sample_data=[],
             issues=[],
@@ -62,10 +67,12 @@ def sample_destination_contract() -> DestinationContract:
     """Return a sample destination contract"""
     return DestinationContract(
         destination_id="test_destination",
-        data_schema=DestinationSchema(
-            fields=["id", "date", "amount"],
-            types=["uuid", "date", "decimal"],
-            constraints={},
+        schema=DestinationSchema(
+            fields=[
+                FieldDefinition(name="id", data_type="uuid"),
+                FieldDefinition(name="date", data_type="date"),
+                FieldDefinition(name="amount", data_type="decimal"),
+            ]
         ),
         validation_rules=ValidationRules(
             required_fields=["id", "date"],
@@ -84,9 +91,10 @@ def sample_transformation_contract() -> TransformationContract:
         transformation_id="test_transformation",
         source_ref="test_source",
         destination_ref="test_destination",
-        field_mappings={"date": "date", "amount": "amount"},
-        transformations={},
-        enrichment={},
+        field_mappings=[
+            FieldMapping(source_field="date", destination_field="date"),
+            FieldMapping(source_field="amount", destination_field="amount"),
+        ],
         business_rules=[],
         execution_plan=ExecutionPlan(
             batch_size=100,
