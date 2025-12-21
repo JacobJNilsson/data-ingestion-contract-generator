@@ -77,20 +77,20 @@ class TestContractValidation:
         """Test that Pydantic catches missing required fields at construction"""
         from pydantic import ValidationError
 
-        # Missing required fields (schema and quality_metrics are required)
+        # Missing required fields (schema and quality are required)
         with pytest.raises(ValidationError):
             SourceContract(
                 source_id="test",
                 source_path="/path/to/file.csv",
                 file_format="csv",
-                # schema and quality_metrics are missing - should raise ValidationError
+                # schema and quality are missing - should raise ValidationError
             )
 
     def test_pydantic_validates_field_types(self) -> None:
         """Test that Pydantic catches invalid field types"""
         from pydantic import ValidationError
 
-        from core.models import QualityMetrics, SourceSchema
+        from core.models import QualityObservation, SourceSchema
 
         # Invalid type for total_rows (should be int >= 0)
         with pytest.raises(ValidationError):
@@ -98,8 +98,8 @@ class TestContractValidation:
                 source_id="test",
                 source_path="/path/to/file.csv",
                 file_format="csv",
-                schema=SourceSchema(fields=[], data_types=[]),
-                quality_metrics=QualityMetrics(total_rows=-1),  # Invalid: negative
+                schema=SourceSchema(fields=[]),
+                quality=QualityObservation(total_rows=-1),  # Invalid: negative
             )
 
 
@@ -155,8 +155,12 @@ class TestContractHandler:
         contract = json.loads(result)
         assert contract["contract_type"] == "destination"
         assert contract["destination_id"] == "test_dest"
-        assert contract["schema"]["fields"] == ["id", "name"]
-        assert contract["schema"]["types"] == ["int", "string"]
+
+        field_names = [f["name"] for f in contract["schema"]["fields"]]
+        assert field_names == ["id", "name"]
+
+        field_types = [f["data_type"] for f in contract["schema"]["fields"]]
+        assert field_types == ["int", "string"]
 
     def test_generate_transformation_contract(self, handler: ContractHandler) -> None:
         """Test transformation contract generation via handler"""

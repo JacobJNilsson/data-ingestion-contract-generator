@@ -65,36 +65,41 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
+    assert contract["contract_version"] == "2.0"
+    assert contract["destination_id"] == "users_api"
 
-    expected_contract = {
-        "contract_type": "destination",
-        "contract_version": "1.0",
-        "destination_id": "users_api",
-        "schema": {
-            "fields": ["name", "email", "age", "active"],
-            "types": ["text", "email", "integer", "boolean"],
-            "constraints": {
-                "name": ["REQUIRED", "MIN_LENGTH: 1", "MAX_LENGTH: 100"],
-                "email": ["REQUIRED"],
-                "age": ["REQUIRED", "MIN: 0", "MAX: 150"],
-                "active": ["REQUIRED"],
-            },
-        },
-        "metadata": {
-            "destination_type": "api",
-            "endpoint": "/users",
-            "http_method": "POST",
-            "schema_file": str(schema_file),
-        },
-        "validation_rules": {
-            "required_fields": [],
-            "unique_constraints": [],
-            "format_validation": {},
-            "data_range_checks": {},
-        },
-    }
+    fields = contract["schema"]["fields"]
+    assert len(fields) == 4
 
-    assert contract == expected_contract
+    # Check 'name' field
+    name_field = next(f for f in fields if f["name"] == "name")
+    assert name_field["data_type"] == "text"
+    assert not name_field["nullable"]
+    constraints = {c["type"] for c in name_field["constraints"]}
+    assert "not_null" in constraints
+    assert "pattern" in constraints
+
+    # Check 'email' field
+    email_field = next(f for f in fields if f["name"] == "email")
+    assert email_field["data_type"] == "email"
+    assert not email_field["nullable"]
+    constraints = {c["type"] for c in email_field["constraints"]}
+    assert "not_null" in constraints
+
+    # Check 'age' field
+    age_field = next(f for f in fields if f["name"] == "age")
+    assert age_field["data_type"] == "integer"
+    assert not age_field["nullable"]
+    constraints = {c["type"] for c in age_field["constraints"]}
+    assert "not_null" in constraints
+    assert "range" in constraints
+
+    # Check 'active' field
+    active_field = next(f for f in fields if f["name"] == "active")
+    assert active_field["data_type"] == "boolean"
+    assert not active_field["nullable"]
+    constraints = {c["type"] for c in active_field["constraints"]}
+    assert "not_null" in constraints
 
 
 def test_destination_api_cli_with_yaml_schema(tmp_path: Path) -> None:
@@ -143,31 +148,15 @@ paths:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
+    assert contract["contract_version"] == "2.0"
 
-    expected_contract = {
-        "contract_type": "destination",
-        "contract_version": "1.0",
-        "destination_id": "data_api",
-        "schema": {
-            "fields": ["id", "value"],
-            "types": ["uuid", "float"],
-            "constraints": {},
-        },
-        "metadata": {
-            "destination_type": "api",
-            "endpoint": "/data",
-            "http_method": "POST",
-            "schema_file": str(schema_file),
-        },
-        "validation_rules": {
-            "required_fields": [],
-            "unique_constraints": [],
-            "format_validation": {},
-            "data_range_checks": {},
-        },
-    }
+    field_names = [f["name"] for f in contract["schema"]["fields"]]
+    assert "id" in field_names
+    assert "value" in field_names
 
-    assert contract == expected_contract
+    field_types = {f["name"]: f["data_type"] for f in contract["schema"]["fields"]}
+    assert field_types["id"] == "uuid"
+    assert field_types["value"] == "float"
 
 
 def test_destination_api_cli_endpoint_not_found(tmp_path: Path) -> None:
@@ -271,9 +260,9 @@ def test_destination_api_cli_list_json_output(tmp_path: Path) -> None:
     output_sorted = sorted(output, key=lambda x: (x["path"], x["method"]))
 
     expected = [
-        {"method": "GET", "path": "/products", "summary": "List products"},
-        {"method": "GET", "path": "/users", "summary": "Get users"},
-        {"method": "POST", "path": "/users", "summary": "Create user"},
+        {"method": "GET", "path": "/products", "summary": "List products", "fields": []},
+        {"method": "GET", "path": "/users", "summary": "Get users", "fields": []},
+        {"method": "POST", "path": "/users", "summary": "Create user", "fields": []},
     ]
 
     assert output_sorted == expected
@@ -298,6 +287,6 @@ def test_destination_api_cli_list_filter_by_method(tmp_path: Path) -> None:
     assert result.exit_code == 0
     output = json.loads(result.stdout)
 
-    expected = [{"method": "POST", "path": "/users", "summary": "Create user"}]
+    expected = [{"method": "POST", "path": "/users", "summary": "Create user", "fields": []}]
 
     assert output == expected
