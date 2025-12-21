@@ -63,7 +63,7 @@ def save_contract(contract: Contract, contract_path: str) -> bool:
         path = Path(contract_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as file:
-            file.write(contract.model_dump_json(indent=2, exclude_none=False, by_alias=True))
+            file.write(contract.model_dump_json(indent=2, exclude_none=True, by_alias=True))
             return True
     except (OSError, TypeError):
         return False
@@ -112,7 +112,7 @@ class ContractHandler:
 
         try:
             contract = generate_source_contract(str(source_full_path), source_id, config)
-            return contract.model_dump_json(indent=2, exclude_none=False, by_alias=True)
+            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
         except (ValueError, OSError, ValidationError) as e:
             return json.dumps({"error": f"Failed to generate source contract: {e!s}"}, indent=2)
 
@@ -134,7 +134,7 @@ class ContractHandler:
         """
         try:
             contract = generate_destination_contract(destination_id, schema, config)
-            return contract.model_dump_json(indent=2, exclude_none=False, by_alias=True)
+            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
         except (ValueError, TypeError, ValidationError) as e:
             return json.dumps({"error": f"Failed to generate destination contract: {e!s}"}, indent=2)
 
@@ -158,7 +158,7 @@ class ContractHandler:
         """
         try:
             contract = generate_transformation_contract(transformation_id, source_ref, destination_ref, config)
-            return contract.model_dump_json(indent=2, exclude_none=False, by_alias=True)
+            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
         except (ValueError, TypeError, ValidationError) as e:
             return json.dumps({"error": f"Failed to generate transformation contract: {e!s}"}, indent=2)
 
@@ -209,7 +209,7 @@ class ContractHandler:
 
             # Note: We don't include the connection string in the contract for security
             # It should be managed externally
-            return contract.model_dump_json(indent=2, exclude_none=False, by_alias=True)
+            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
 
         except ValueError as e:
             return json.dumps({"error": f"Validation error: {e!s}"}, indent=2)
@@ -294,7 +294,7 @@ class ContractHandler:
 
             # Convert to JSON-serializable format
             contracts_data = [
-                contract.model_dump(mode="json", by_alias=True, exclude_none=False) for contract in contracts
+                contract.model_dump(mode="json", by_alias=True, exclude_none=True) for contract in contracts
             ]
 
             return json.dumps({"contracts": contracts_data, "count": len(contracts)}, indent=2)

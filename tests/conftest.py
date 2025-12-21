@@ -8,10 +8,13 @@ from core.models import (
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
+    FieldDefinition,
+    ObservedQuality,
     QualityMetrics,
     SourceContract,
     SourceSchema,
     TransformationContract,
+    ValidationRule,
     ValidationRules,
 )
 
@@ -45,13 +48,18 @@ def sample_source_contract() -> SourceContract:
         delimiter=",",
         has_header=True,
         data_schema=SourceSchema(
-            fields=["date", "amount", "description"],
-            data_types=["date", "numeric", "text"],
+            fields=[
+                FieldDefinition(name="date", type="date"),
+                FieldDefinition(name="amount", type="numeric"),
+                FieldDefinition(name="description", type="text"),
+            ],
         ),
         quality_metrics=QualityMetrics(
-            total_rows=100,
-            sample_data=[],
-            issues=[],
+            observed=ObservedQuality(
+                total_rows=100,
+                sample_data=[],
+                issues=[],
+            ),
         ),
         metadata={},
     )
@@ -63,15 +71,17 @@ def sample_destination_contract() -> DestinationContract:
     return DestinationContract(
         destination_id="test_destination",
         data_schema=DestinationSchema(
-            fields=["id", "date", "amount"],
-            types=["uuid", "date", "decimal"],
-            constraints={},
+            fields=[
+                FieldDefinition(name="id", type="uuid", constraints=["primary_key"]),
+                FieldDefinition(name="date", type="date"),
+                FieldDefinition(name="amount", type="decimal"),
+            ],
         ),
         validation_rules=ValidationRules(
-            required_fields=["id", "date"],
-            unique_constraints=["id"],
-            data_range_checks={},
-            format_validation={},
+            rules=[
+                ValidationRule(id="id_required", type="required", field="id", params={}),
+                ValidationRule(id="id_unique", type="unique", field="id", params={}),
+            ],
         ),
         metadata={},
     )
@@ -84,9 +94,11 @@ def sample_transformation_contract() -> TransformationContract:
         transformation_id="test_transformation",
         source_ref="test_source",
         destination_ref="test_destination",
-        field_mappings={"date": "date", "amount": "amount"},
-        transformations={},
-        enrichment={},
+        field_mappings=[
+            {"destination_field": "date", "source_fields": ["date"], "operation": "direct"},
+            {"destination_field": "amount", "source_fields": ["amount"], "operation": "direct"},
+        ],
+        transformations=[],
         business_rules=[],
         execution_plan=ExecutionPlan(
             batch_size=100,
@@ -103,7 +115,7 @@ def saved_source_contract(tmp_path: Path, sample_source_contract: SourceContract
     """Save a sample source contract and return its path"""
     contract_path = tmp_path / "source_contract.json"
     with contract_path.open("w") as f:
-        f.write(sample_source_contract.model_dump_json(indent=2, by_alias=True))
+        f.write(sample_source_contract.model_dump_json(indent=2, by_alias=True, exclude_none=True))
     return contract_path
 
 
@@ -112,7 +124,7 @@ def saved_destination_contract(tmp_path: Path, sample_destination_contract: Dest
     """Save a sample destination contract and return its path"""
     contract_path = tmp_path / "destination_contract.json"
     with contract_path.open("w") as f:
-        f.write(sample_destination_contract.model_dump_json(indent=2, by_alias=True))
+        f.write(sample_destination_contract.model_dump_json(indent=2, by_alias=True, exclude_none=True))
     return contract_path
 
 
@@ -121,5 +133,5 @@ def saved_transformation_contract(tmp_path: Path, sample_transformation_contract
     """Save a sample transformation contract and return its path"""
     contract_path = tmp_path / "transformation_contract.json"
     with contract_path.open("w") as f:
-        f.write(sample_transformation_contract.model_dump_json(indent=2, by_alias=True))
+        f.write(sample_transformation_contract.model_dump_json(indent=2, by_alias=True, exclude_none=True))
     return contract_path

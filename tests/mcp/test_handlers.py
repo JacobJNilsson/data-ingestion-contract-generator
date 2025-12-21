@@ -90,7 +90,7 @@ class TestContractValidation:
         """Test that Pydantic catches invalid field types"""
         from pydantic import ValidationError
 
-        from core.models import QualityMetrics, SourceSchema
+        from core.models import ObservedQuality, QualityMetrics, SourceSchema
 
         # Invalid type for total_rows (should be int >= 0)
         with pytest.raises(ValidationError):
@@ -98,8 +98,10 @@ class TestContractValidation:
                 source_id="test",
                 source_path="/path/to/file.csv",
                 file_format="csv",
-                schema=SourceSchema(fields=[], data_types=[]),
-                quality_metrics=QualityMetrics(total_rows=-1),  # Invalid: negative
+                schema=SourceSchema(fields=[]),
+                quality_metrics=QualityMetrics(
+                    observed=ObservedQuality(total_rows=-1, sample_data=[], issues=[])
+                ),  # Invalid: negative
             )
 
 

@@ -40,12 +40,13 @@ class TestBOMHandling:
         contract = generate_source_contract(str(csv_file), "test_bom")
 
         # Check that BOM is not in the schema fields
-        assert contract.data_schema.fields[0] == "Datum"
-        assert "\ufeff" not in contract.data_schema.fields[0]
+        assert contract.data_schema.fields[0].name == "Datum"
+        assert "\ufeff" not in contract.data_schema.fields[0].name
 
         # Check that BOM presence is noted in quality issues
-        assert len(contract.quality_metrics.issues) > 0
-        assert any("BOM" in issue for issue in contract.quality_metrics.issues)
+        assert contract.quality_metrics.observed is not None
+        assert len(contract.quality_metrics.observed.issues) > 0
+        assert any("BOM" in issue for issue in contract.quality_metrics.observed.issues)
 
 
 class TestDataTypeDetection:
@@ -167,14 +168,14 @@ class TestAvanzaRealDataIssues:
         contract = generate_source_contract(str(csv_file), "avanza_transactions")
 
         # Test BOM is stripped
-        assert contract.data_schema.fields[0] == "Datum"
-        assert "\ufeff" not in contract.data_schema.fields[0]
+        assert contract.data_schema.fields[0].name == "Datum"
+        assert "\ufeff" not in contract.data_schema.fields[0].name
 
         # Test proper delimiter detection
         assert contract.delimiter == ";"
 
         # Test data type detection (should scan multiple rows)
-        types = contract.data_schema.data_types
+        types = [field.type for field in contract.data_schema.fields]
         assert types[0] == "date", "Datum should be date"
         assert types[1] == "text", "Konto should be text"
         assert types[4] == "numeric", "Antal should be numeric (has 190, 22)"
@@ -189,5 +190,5 @@ class TestAvanzaRealDataIssues:
         populated_columns = [0, 1, 4, 5, 6, 8, 9, 10, 11]  # Columns that have data
         for col_idx in populated_columns:
             assert types[col_idx] != "empty", (
-                f"Column {col_idx} ({contract.data_schema.fields[col_idx]}) should not be 'empty'"
+                f"Column {col_idx} ({contract.data_schema.fields[col_idx].name}) should not be 'empty'"
             )

@@ -173,18 +173,20 @@ def test_generate_database_source_contract_from_table(sqlite_db: str) -> None:
 
     # Check schema
     schema = contract.data_schema
-    assert "id" in schema.fields
-    assert "username" in schema.fields
-    assert "email" in schema.fields
-    assert "age" in schema.fields
-    assert "balance" in schema.fields
+    field_names = {field.name for field in schema.fields}
+    assert "id" in field_names
+    assert "username" in field_names
+    assert "email" in field_names
+    assert "age" in field_names
+    assert "balance" in field_names
 
     # Check that types are mapped correctly
-    assert len(schema.fields) == len(schema.data_types)
+    assert len(schema.fields) == len(field_names)
 
     # Check quality metrics
-    assert contract.quality_metrics.total_rows == 3
-    assert len(contract.quality_metrics.sample_data) <= 10
+    assert contract.quality_metrics.observed is not None
+    assert contract.quality_metrics.observed.total_rows == 3
+    assert len(contract.quality_metrics.observed.sample_data) <= 10
 
     # Check metadata
     assert contract.metadata.get("database_type") == "sqlite"
@@ -214,10 +216,11 @@ def test_generate_database_source_contract_from_query(sqlite_db: str) -> None:
 
     # Check schema - should only have selected columns
     schema = contract.data_schema
-    assert set(schema.fields) == {"username", "email", "age"}
+    assert {field.name for field in schema.fields} == {"username", "email", "age"}
 
     # Check quality metrics - should only have active users
-    assert contract.quality_metrics.total_rows == 2
+    assert contract.quality_metrics.observed is not None
+    assert contract.quality_metrics.observed.total_rows == 2
 
 
 def test_generate_database_source_contract_with_sample_size(sqlite_db: str) -> None:
@@ -232,8 +235,9 @@ def test_generate_database_source_contract_with_sample_size(sqlite_db: str) -> N
     )
 
     # Should limit sample data but not affect total count
-    assert contract.quality_metrics.total_rows == 3
-    assert len(contract.quality_metrics.sample_data) <= 10  # We always limit display to 10
+    assert contract.quality_metrics.observed is not None
+    assert contract.quality_metrics.observed.total_rows == 3
+    assert len(contract.quality_metrics.observed.sample_data) <= 10  # We always limit display to 10
     assert contract.metadata.get("sample_size") == 1
 
 

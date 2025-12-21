@@ -134,22 +134,68 @@ class SourceAnalysisResult(BaseModel):
 class SourceSchema(BaseModel):
     """Schema definition for a data source"""
 
-    fields: list[str] = Field(description="List of field/column names")
-    data_types: list[str] = Field(description="Detected data types for each field")
+    fields: list["FieldDefinition"] = Field(default_factory=list, description="List of field definitions")
 
 
 class QualityMetrics(BaseModel):
     """Quality metrics for a data source"""
 
+    observed: "ObservedQuality | None" = Field(
+        default=None, description="Observed data quality metrics (profiling output)"
+    )
+    expected: "ExpectedQuality | None" = Field(
+        default=None, description="Expected data quality targets for validation"
+    )
+
+
+class FieldDefinition(BaseModel):
+    """Schema definition for a single field"""
+
+    name: str = Field(description="Field name")
+    type: str = Field(description="Field data type")
+    nullable: bool | None = Field(default=None, description="Whether the field allows NULL values")
+    description: str | None = Field(default=None, description="Optional field description")
+    examples: list[str] | None = Field(default=None, description="Example values for the field")
+    constraints: list[str] | None = Field(default=None, description="Field constraints (e.g., primary_key)")
+    classification: list[str] | None = Field(default=None, description="Data classification tags (e.g., pii)")
+    sensitivity: str | None = Field(default=None, description="Sensitivity label (e.g., high, medium)")
+
+
+class FieldMetric(BaseModel):
+    """Profiling metrics for a single field"""
+
+    field: str = Field(description="Field name")
+    null_rate: float | None = Field(default=None, ge=0.0, le=1.0, description="Observed null rate")
+    distinct_count: int | None = Field(default=None, ge=0, description="Observed distinct count")
+    min: str | None = Field(default=None, description="Observed minimum value")
+    max: str | None = Field(default=None, description="Observed maximum value")
+
+
+class ObservedQuality(BaseModel):
+    """Observed data quality metrics from profiling"""
+
     total_rows: int = Field(ge=0, description="Total number of rows in the source")
     sample_data: list[list[str]] = Field(default_factory=list, description="Sample data rows")
     issues: list[str] = Field(default_factory=list, description="List of quality issues detected")
+    field_metrics: list[FieldMetric] | None = Field(
+        default=None, description="Per-field profiling metrics"
+    )
+
+
+class ExpectedQuality(BaseModel):
+    """Expected quality targets for validation"""
+
+    required_fields: list[str] = Field(default_factory=list, description="Fields that must be present")
+    max_missing_rate: float | None = Field(
+        default=None, ge=0.0, le=1.0, description="Maximum allowed missing rate across fields"
+    )
+    rules: list[str] = Field(default_factory=list, description="Additional quality rules or expectations")
 
 
 class SourceContract(BaseModel):
     """Contract describing a data source"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["source"] = Field(default="source", description="Type of contract")
     source_id: str = Field(description="Unique identifier for this source (auto-generated if not provided)")
     # File-based sources
@@ -179,24 +225,29 @@ class SourceContract(BaseModel):
 class DestinationSchema(BaseModel):
     """Schema definition for a data destination"""
 
-    fields: list[str] = Field(default_factory=list, description="List of field names")
-    types: list[str] = Field(default_factory=list, description="Data types for each field")
-    constraints: dict[str, Any] = Field(default_factory=dict, description="Field constraints")
+    fields: list[FieldDefinition] = Field(default_factory=list, description="List of field definitions")
+
+
+class ValidationRule(BaseModel):
+    """Validation rule for data"""
+
+    id: str = Field(description="Rule identifier")
+    type: str = Field(description="Rule type (e.g., range, format, uniqueness)")
+    field: str | None = Field(default=None, description="Field the rule applies to")
+    params: dict[str, Any] = Field(default_factory=dict, description="Rule parameters")
+    severity: Literal["error", "warning"] = Field(default="error", description="Validation severity")
 
 
 class ValidationRules(BaseModel):
     """Validation rules for data"""
 
-    required_fields: list[str] = Field(default_factory=list, description="Fields that must be present")
-    unique_constraints: list[str] = Field(default_factory=list, description="Fields that must be unique")
-    data_range_checks: dict[str, Any] = Field(default_factory=dict, description="Range checks for numeric fields")
-    format_validation: dict[str, Any] = Field(default_factory=dict, description="Format validation patterns")
+    rules: list[ValidationRule] = Field(default_factory=list, description="Validation rules to apply")
 
 
 class DestinationContract(BaseModel):
     """Contract describing a data destination"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["destination"] = Field(default="destination", description="Type of contract")
     destination_id: str = Field(description="Unique identifier for this destination")
     data_schema: DestinationSchema = Field(description="Schema definition", alias="schema")
@@ -211,6 +262,27 @@ class DestinationContract(BaseModel):
 # ============================================================================
 
 
+class FieldMapping(BaseModel):
+    """Mapping definition between source and destination fields"""
+
+    destination_field: str = Field(description="Destination field name")
+    source_fields: list[str] = Field(description="Source field names")
+    operation: str = Field(default="direct", description="Mapping operation (e.g., direct, concat, add)")
+    params: dict[str, Any] = Field(default_factory=dict, description="Operation parameters")
+    notes: str | None = Field(default=None, description="Optional mapping notes")
+
+
+class TransformationStep(BaseModel):
+    """Structured transformation step"""
+
+    id: str = Field(description="Transformation step identifier")
+    type: str = Field(description="Transformation type (e.g., cast, parse, normalize)")
+    inputs: list[str] = Field(description="Input fields for the transformation")
+    outputs: list[str] = Field(description="Output fields for the transformation")
+    params: dict[str, Any] = Field(default_factory=dict, description="Transformation parameters")
+    notes: str | None = Field(default=None, description="Optional transformation notes")
+
+
 class ExecutionPlan(BaseModel):
     """Execution plan for data transformation"""
 
@@ -223,17 +295,18 @@ class ExecutionPlan(BaseModel):
 class TransformationContract(BaseModel):
     """Contract describing a data transformation from source to destination"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["transformation"] = Field(default="transformation", description="Type of contract")
     transformation_id: str = Field(description="Unique identifier for this transformation")
     source_ref: str = Field(description="Reference to source contract ID")
     destination_ref: str = Field(description="Reference to destination contract ID")
-    field_mappings: dict[str, str] = Field(
-        default_factory=dict, description="Mapping from destination fields to source fields"
+    mapping: list["FieldMapping"] = Field(
+        default_factory=list, description="Field mappings from source to destination", alias="field_mappings"
     )
-    transformations: dict[str, Any] = Field(default_factory=dict, description="Transformations to apply to fields")
-    enrichment: dict[str, Any] = Field(default_factory=dict, description="Enrichment rules")
-    business_rules: list[Any] = Field(default_factory=list, description="Business rules to apply")
+    transformations: list["TransformationStep"] = Field(
+        default_factory=list, description="Transformations to apply as structured steps"
+    )
+    business_rules: list[str] = Field(default_factory=list, description="Business rules to apply")
     execution_plan: ExecutionPlan = Field(default_factory=ExecutionPlan, description="Execution configuration")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 

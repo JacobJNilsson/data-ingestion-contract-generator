@@ -68,17 +68,31 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
 
     expected_contract = {
         "contract_type": "destination",
-        "contract_version": "1.0",
+        "contract_version": "2.0",
         "destination_id": "users_api",
         "schema": {
-            "fields": ["name", "email", "age", "active"],
-            "types": ["text", "email", "integer", "boolean"],
-            "constraints": {
-                "name": ["REQUIRED", "MIN_LENGTH: 1", "MAX_LENGTH: 100"],
-                "email": ["REQUIRED"],
-                "age": ["REQUIRED", "MIN: 0", "MAX: 150"],
-                "active": ["REQUIRED"],
-            },
+            "fields": [
+                {
+                    "name": "name",
+                    "type": "text",
+                    "constraints": ["REQUIRED", "MIN_LENGTH: 1", "MAX_LENGTH: 100"],
+                },
+                {
+                    "name": "email",
+                    "type": "email",
+                    "constraints": ["REQUIRED"],
+                },
+                {
+                    "name": "age",
+                    "type": "integer",
+                    "constraints": ["REQUIRED", "MIN: 0", "MAX: 150"],
+                },
+                {
+                    "name": "active",
+                    "type": "boolean",
+                    "constraints": ["REQUIRED"],
+                },
+            ],
         },
         "metadata": {
             "destination_type": "api",
@@ -86,12 +100,7 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
             "http_method": "POST",
             "schema_file": str(schema_file),
         },
-        "validation_rules": {
-            "required_fields": [],
-            "unique_constraints": [],
-            "format_validation": {},
-            "data_range_checks": {},
-        },
+        "validation_rules": {"rules": []},
     }
 
     assert contract == expected_contract
@@ -146,12 +155,19 @@ paths:
 
     expected_contract = {
         "contract_type": "destination",
-        "contract_version": "1.0",
+        "contract_version": "2.0",
         "destination_id": "data_api",
         "schema": {
-            "fields": ["id", "value"],
-            "types": ["uuid", "float"],
-            "constraints": {},
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uuid",
+                },
+                {
+                    "name": "value",
+                    "type": "float",
+                },
+            ],
         },
         "metadata": {
             "destination_type": "api",
@@ -159,12 +175,7 @@ paths:
             "http_method": "POST",
             "schema_file": str(schema_file),
         },
-        "validation_rules": {
-            "required_fields": [],
-            "unique_constraints": [],
-            "format_validation": {},
-            "data_range_checks": {},
-        },
+        "validation_rules": {"rules": []},
     }
 
     assert contract == expected_contract

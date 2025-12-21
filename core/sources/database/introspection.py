@@ -2,9 +2,28 @@
 
 from sqlalchemy import MetaData, Table, inspect, select, text
 
-from core.models import ColumnInfo, QualityMetrics, QueryMetadata, SchemaInfo, SourceSchema, TableMetadata
+from core.models import (
+    ColumnInfo,
+    FieldDefinition,
+    ObservedQuality,
+    QualityMetrics,
+    QueryMetadata,
+    SchemaInfo,
+    SourceSchema,
+    TableMetadata,
+)
 from core.sources.database.engine import create_database_engine
 from core.sources.database.type_mapping import map_database_type_to_contract_type
+
+
+def _build_field_definitions(fields: list[str], types: list[str]) -> list[FieldDefinition]:
+    return [
+        FieldDefinition(
+            name=field_name,
+            type=field_type,
+        )
+        for field_name, field_type in zip(fields, types, strict=False)
+    ]
 
 
 def analyze_database_table(
@@ -49,7 +68,7 @@ def analyze_database_table(
         data_types = [map_database_type_to_contract_type(str(col["type"]), database_type) for col in columns]
 
         # Create schema
-        source_schema = SourceSchema(fields=field_names, data_types=data_types)
+        source_schema = SourceSchema(fields=_build_field_definitions(field_names, data_types))
 
         # Get primary key info
         pk_constraint = inspector.get_pk_constraint(source_name, schema=schema)
@@ -84,9 +103,11 @@ def analyze_database_table(
             issues.append(f"Nullable columns: {', '.join(nullable_columns[:5])}")
 
         quality_metrics = QualityMetrics(
-            total_rows=total_rows,
-            sample_data=sample_data,
-            issues=issues,
+            observed=ObservedQuality(
+                total_rows=total_rows,
+                sample_data=sample_data,
+                issues=issues,
+            ),
         )
 
         # Add column details
@@ -244,7 +265,7 @@ def analyze_database_query(
                     data_types.append("text")
 
             # Create schema
-            source_schema = SourceSchema(fields=field_names, data_types=data_types)
+            source_schema = SourceSchema(fields=_build_field_definitions(field_names, data_types))
 
             # Convert sample data to list of lists of strings
             sample_data = [[str(val) if val is not None else "" for val in row] for row in sample_rows[:10]]
@@ -263,9 +284,11 @@ def analyze_database_query(
                 issues.append("Query returned no results")
 
             quality_metrics = QualityMetrics(
-                total_rows=total_rows,
-                sample_data=sample_data,
-                issues=issues,
+                observed=ObservedQuality(
+                    total_rows=total_rows,
+                    sample_data=sample_data,
+                    issues=issues,
+                ),
             )
 
             # Create metadata

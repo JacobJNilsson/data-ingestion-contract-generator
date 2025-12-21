@@ -11,6 +11,8 @@ from core.models import (
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
+    FieldDefinition,
+    ObservedQuality,
     QualityMetrics,
     SourceAnalysisResult,
     SourceContract,
@@ -19,6 +21,24 @@ from core.models import (
 )
 from core.sources.csv import analyze_csv_file
 from core.sources.json import analyze_json_file
+
+
+def _build_field_definitions(
+    fields: list[str], types: list[str], constraints: dict[str, list[str]] | None = None
+) -> list[FieldDefinition]:
+    constraints = constraints or {}
+    field_definitions: list[FieldDefinition] = []
+    for field_name, field_type in zip(fields, types, strict=False):
+        constraint_value = constraints.get(field_name, [])
+        constraint_list = [constraint_value] if isinstance(constraint_value, str) else constraint_value
+        field_definitions.append(
+            FieldDefinition(
+                name=field_name,
+                type=field_type,
+                constraints=constraint_list or None,
+            )
+        )
+    return field_definitions
 
 
 def generate_source_analysis(source_path: str, sample_size: int = 1000) -> SourceAnalysisResult:
@@ -78,13 +98,17 @@ def generate_source_contract(
         delimiter=source_analysis.delimiter,
         has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
         schema=SourceSchema(
-            fields=source_analysis.sample_fields,
-            data_types=source_analysis.data_types,
+            fields=_build_field_definitions(
+                source_analysis.sample_fields,
+                source_analysis.data_types,
+            ),
         ),
         quality_metrics=QualityMetrics(
-            total_rows=source_analysis.total_rows,
-            sample_data=source_analysis.sample_data,
-            issues=source_analysis.issues,
+            observed=ObservedQuality(
+                total_rows=source_analysis.total_rows,
+                sample_data=source_analysis.sample_data,
+                issues=source_analysis.issues,
+            ),
         ),
         metadata=config or {},
     )
@@ -182,11 +206,16 @@ def generate_destination_contract(
 
     # Parse schema if provided, otherwise use defaults
     if schema:
-        dest_schema = DestinationSchema(
-            fields=schema.get("fields", []),
-            types=schema.get("types", []),
-            constraints=schema.get("constraints", {}),
-        )
+        fields_value = schema.get("fields", [])
+        if fields_value and isinstance(fields_value[0], dict):
+            field_definitions = [FieldDefinition(**field) for field in fields_value]
+        else:
+            field_definitions = _build_field_definitions(
+                schema.get("fields", []),
+                schema.get("types", []),
+                schema.get("constraints", {}),
+            )
+        dest_schema = DestinationSchema(fields=field_definitions)
     else:
         dest_schema = DestinationSchema()
 
