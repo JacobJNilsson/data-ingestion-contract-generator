@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Utility Models
@@ -15,6 +15,92 @@ class NumericFormatInfo(BaseModel):
     has_comma_decimal: bool = Field(description="Whether the number uses comma as decimal separator")
     has_thousands_sep: bool = Field(description="Whether the number uses thousands separator")
     format: Literal["european", "us"] = Field(description="Detected numeric format (european or us)")
+
+
+# ============================================================================
+# Field Property Models
+# ============================================================================
+
+
+class FieldConstraint(BaseModel):
+    """Specific constraint for a field"""
+
+    type: Literal["not_null", "unique", "range", "pattern", "enum", "foreign_key", "primary_key"] = Field(
+        description="Type of constraint"
+    )
+    value: Any | None = Field(default=None, description="Constraint value (e.g., regex pattern, range, enum list)")
+    min_value: Any | None = Field(default=None, description="Minimum value for range constraint")
+    max_value: Any | None = Field(default=None, description="Maximum value for range constraint")
+    referred_table: str | None = Field(default=None, description="Table referenced by foreign key")
+    referred_column: str | None = Field(default=None, description="Column referenced by foreign key")
+
+
+class FieldProfile(BaseModel):
+    """Profiling statistics for a field"""
+
+    null_count: int = Field(default=0, ge=0, description="Number of null values")
+    null_percentage: float = Field(default=0.0, ge=0.0, le=100.0, description="Percentage of null values")
+    distinct_count: int = Field(default=0, ge=0, description="Number of distinct values")
+    min_value: Any | None = Field(default=None, description="Minimum value found")
+    max_value: Any | None = Field(default=None, description="Maximum value found")
+    sample_values: list[Any] = Field(default_factory=list, description="Sample of values found in the field")
+
+
+class FieldDefinition(BaseModel):
+    """Complete definition of a field/column"""
+
+    name: str = Field(description="Field name")
+    data_type: str = Field(description="Data type (e.g., string, integer, date)")
+    nullable: bool = Field(default=True, description="Whether the field can be null")
+    description: str | None = Field(default=None, description="Field description/business meaning")
+    constraints: list[FieldConstraint] = Field(default_factory=list, description="List of constraints for this field")
+    profiling: FieldProfile | None = Field(default=None, description="Profiling information")
+
+
+class FieldTransformation(BaseModel):
+    """Definition of a data transformation"""
+
+    type: Literal["rename", "cast", "format", "lookup", "calculate", "default"] = Field(
+        description="Type of transformation"
+    )
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Transformation-specific parameters")
+
+
+class FieldMapping(BaseModel):
+    """Mapping from destination field to source field(s)"""
+
+    destination_field: str = Field(description="Name of the destination field")
+    source_field: str | None = Field(default=None, description="Name of the source field (None for computed fields)")
+    transformation: FieldTransformation | None = Field(default=None, description="Transformation to apply")
+
+
+# ============================================================================
+# Quality Models
+# ============================================================================
+
+
+class QualityExpectation(BaseModel):
+    """Expected quality thresholds and rules"""
+
+    max_null_percentage: float | None = Field(
+        default=None, ge=0.0, le=100.0, description="Maximum allowed null percentage"
+    )
+    min_distinct_count: int | None = Field(default=None, ge=0, description="Minimum allowed distinct values")
+    allowed_values: list[Any] | None = Field(default=None, description="List of allowed values (enum)")
+
+
+class QualityObservation(BaseModel):
+    """Actual observed quality vs expectation"""
+
+    total_rows: int = Field(default=0, ge=0, description="Total number of rows analyzed")
+    expectation: QualityExpectation | None = Field(
+        default=None, description="The expectations this was checked against"
+    )
+    observed_profiling: dict[str, FieldProfile] = Field(
+        default_factory=dict, description="Observed profiling per field"
+    )
+    issues: list[str] = Field(default_factory=list, description="List of quality issues or violations detected")
+    sample_data: list[list[Any]] = Field(default_factory=list, description="Sample data rows")
 
 
 class ColumnInfo(BaseModel):
@@ -91,11 +177,7 @@ class QueryMetadata(BaseModel):
 class SchemaInfo(BaseModel):
     """Schema information extracted from a source (table or API)"""
 
-    fields: list[str] = Field(description="List of column/field names")
-    types: list[str] = Field(description="List of data types")
-    constraints: dict[str, list[str]] = Field(
-        default_factory=dict, description="Constraints (field_name -> list of constraint strings)"
-    )
+    fields: list[FieldDefinition] = Field(description="List of field definitions")
 
 
 class EndpointInfo(BaseModel):
@@ -104,9 +186,7 @@ class EndpointInfo(BaseModel):
     method: str = Field(description="HTTP method")
     path: str = Field(description="Endpoint path")
     summary: str | None = Field(default=None, description="Endpoint summary/description")
-    fields: list[str] | None = Field(default=None, description="List of field names (if schema extracted)")
-    types: list[str] | None = Field(default=None, description="List of data types")
-    constraints: dict[str, list[str]] | None = Field(default=None, description="Field constraints")
+    fields: list[FieldDefinition] = Field(default_factory=list, description="List of field definitions")
     error: str | None = Field(default=None, description="Error message if schema extraction failed")
 
     model_config = {"populate_by_name": True}
@@ -120,6 +200,7 @@ class SourceAnalysisResult(BaseModel):
     delimiter: str | None = Field(default=None, description="CSV delimiter (None for JSON)")
     has_header: bool | None = Field(default=None, description="Whether CSV has header row (None for JSON)")
     total_rows: int = Field(description="Total number of rows/objects in the file")
+    field_profiles: dict[str, FieldProfile] = Field(default_factory=dict, description="Profiling information per field")
     sample_fields: list[str] = Field(description="List of field/column names")
     sample_data: list[list[str]] = Field(default_factory=list, description="Sample data rows (first 5 rows)")
     data_types: list[str] = Field(description="Detected data types for each field")
@@ -134,8 +215,7 @@ class SourceAnalysisResult(BaseModel):
 class SourceSchema(BaseModel):
     """Schema definition for a data source"""
 
-    fields: list[str] = Field(description="List of field/column names")
-    data_types: list[str] = Field(description="Detected data types for each field")
+    fields: list[FieldDefinition] = Field(description="List of field definitions")
 
 
 class QualityMetrics(BaseModel):
@@ -149,7 +229,7 @@ class QualityMetrics(BaseModel):
 class SourceContract(BaseModel):
     """Contract describing a data source"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["source"] = Field(default="source", description="Type of contract")
     source_id: str = Field(description="Unique identifier for this source (auto-generated if not provided)")
     # File-based sources
@@ -165,10 +245,21 @@ class SourceContract(BaseModel):
     database_schema: str | None = Field(default=None, description="Database schema name")
     # Common fields
     data_schema: SourceSchema = Field(description="Schema information", alias="schema")
-    quality_metrics: QualityMetrics = Field(description="Quality assessment")
+    quality: QualityObservation = Field(description="Quality assessment")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Custom model_dump to exclude None and empty collections by default"""
+        kwargs.setdefault("exclude_none", True)
+        kwargs.setdefault("exclude_unset", False)
+        kwargs.setdefault("exclude_defaults", False)
+        kwargs.setdefault("by_alias", True)
+        return super().model_dump(*args, **kwargs)
 
 
 # ============================================================================
@@ -179,9 +270,7 @@ class SourceContract(BaseModel):
 class DestinationSchema(BaseModel):
     """Schema definition for a data destination"""
 
-    fields: list[str] = Field(default_factory=list, description="List of field names")
-    types: list[str] = Field(default_factory=list, description="Data types for each field")
-    constraints: dict[str, Any] = Field(default_factory=dict, description="Field constraints")
+    fields: list[FieldDefinition] = Field(default_factory=list, description="List of field definitions")
 
 
 class ValidationRules(BaseModel):
@@ -196,14 +285,25 @@ class ValidationRules(BaseModel):
 class DestinationContract(BaseModel):
     """Contract describing a data destination"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["destination"] = Field(default="destination", description="Type of contract")
     destination_id: str = Field(description="Unique identifier for this destination")
     data_schema: DestinationSchema = Field(description="Schema definition", alias="schema")
     validation_rules: ValidationRules = Field(default_factory=ValidationRules, description="Validation rules to apply")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
-    model_config = {"populate_by_name": True}
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Custom model_dump to exclude None and empty collections by default"""
+        kwargs.setdefault("exclude_none", True)
+        kwargs.setdefault("exclude_unset", False)
+        kwargs.setdefault("exclude_defaults", False)
+        kwargs.setdefault("by_alias", True)
+        return super().model_dump(*args, **kwargs)
 
 
 # ============================================================================
@@ -223,19 +323,30 @@ class ExecutionPlan(BaseModel):
 class TransformationContract(BaseModel):
     """Contract describing a data transformation from source to destination"""
 
-    contract_version: str = Field(default="1.0", description="Version of the contract schema")
+    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["transformation"] = Field(default="transformation", description="Type of contract")
     transformation_id: str = Field(description="Unique identifier for this transformation")
     source_ref: str = Field(description="Reference to source contract ID")
     destination_ref: str = Field(description="Reference to destination contract ID")
-    field_mappings: dict[str, str] = Field(
-        default_factory=dict, description="Mapping from destination fields to source fields"
+    field_mappings: list[FieldMapping] = Field(
+        default_factory=list, description="Mapping from destination fields to source fields"
     )
-    transformations: dict[str, Any] = Field(default_factory=dict, description="Transformations to apply to fields")
-    enrichment: dict[str, Any] = Field(default_factory=dict, description="Enrichment rules")
     business_rules: list[Any] = Field(default_factory=list, description="Business rules to apply")
     execution_plan: ExecutionPlan = Field(default_factory=ExecutionPlan, description="Execution configuration")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Custom model_dump to exclude None and empty collections by default"""
+        kwargs.setdefault("exclude_none", True)
+        kwargs.setdefault("exclude_unset", False)
+        kwargs.setdefault("exclude_defaults", False)
+        kwargs.setdefault("by_alias", True)
+        return super().model_dump(*args, **kwargs)
 
 
 # ============================================================================
