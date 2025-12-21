@@ -1,34 +1,40 @@
-# Contract Generator MCP Server
+# Contract Generator Core
 
-This MCP server provides tools for generating three types of contracts for data ingestion pipelines:
+This library provides the core logic and models for generating three types of contracts for data ingestion pipelines:
 
 1. **Source Contracts** - Describe data sources (schema, format, quality)
 2. **Destination Contracts** - Define data destinations (schema, constraints, validation)
 3. **Transformation Contracts** - Map source to destination (field mappings, transformations, enrichment)
 
+These capabilities are exposed via a CLI tool (`contract-gen`) and an MCP server for AI integration.
+
 ## Architecture
 
 The three-contract architecture separates concerns:
 
-- **Source Contract**: Automated analysis of source data files
-- **Destination Contract**: Manual definition of target schema and rules
+- **Source Contract**: Automated analysis of source data files or databases
+- **Destination Contract**: Definition of target schema and rules
 - **Transformation Contract**: References both, defines how to move data from source to destination
 
-## Usage in Cursor
+## AI Integration (MCP)
 
-Add to `.cursor/mcp.json`:
+To use these tools with Cursor, add to `.cursor/mcp.json`:
 
 ```json
 {
   "contract-generator": {
-    "command": "python3",
-    "args": ["/absolute/path/to/project/mcp_server/server.py"],
-    "env": {}
+    "command": "uv",
+    "args": [
+      "--directory",
+      "/absolute/path/to/project",
+      "run",
+      "mcp_server/server.py"
+    ]
   }
 }
 ```
 
-## Available Tools
+## Available Functionality
 
 ### Contract Generation
 

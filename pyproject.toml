@@ -1,7 +1,7 @@
 [project]
 name = "ingestion-contract-mcp"
 version = "0.1.0"
-description = "MCP server for generating data ingestion contracts"
+description = "CLI tool and framework for generating data ingestion contracts"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
 requires-python = ">=3.13"
