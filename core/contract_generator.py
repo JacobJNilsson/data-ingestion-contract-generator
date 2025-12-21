@@ -11,7 +11,8 @@ from core.models import (
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
-    QualityMetrics,
+    FieldDefinition,
+    QualityObservation,
     SourceAnalysisResult,
     SourceContract,
     SourceSchema,
@@ -70,6 +71,12 @@ def generate_source_contract(
         # Use stem (filename without extension) and sanitize it
         source_id = source_file.stem.lower().replace(" ", "_").replace("-", "_")
 
+    # Create field definitions
+    fields = []
+    for name, dtype in zip(source_analysis.sample_fields, source_analysis.data_types, strict=True):
+        profile = source_analysis.field_profiles.get(name)
+        fields.append(FieldDefinition(name=name, data_type=dtype, profiling=profile))
+
     return SourceContract(
         source_id=source_id,
         source_path=str(source_path),
@@ -77,12 +84,10 @@ def generate_source_contract(
         encoding=source_analysis.encoding,
         delimiter=source_analysis.delimiter,
         has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
-        schema=SourceSchema(
-            fields=source_analysis.sample_fields,
-            data_types=source_analysis.data_types,
-        ),
-        quality_metrics=QualityMetrics(
+        schema=SourceSchema(fields=fields),
+        quality=QualityObservation(
             total_rows=source_analysis.total_rows,
+            observed_profiling=source_analysis.field_profiles,
             sample_data=source_analysis.sample_data,
             issues=source_analysis.issues,
         ),
@@ -173,28 +178,48 @@ def generate_destination_contract(
             if schema:
                 api_schema.update(schema)
             schema = api_schema
-
         except Exception as e:
             # If introspection fails, we might still want to proceed if a schema was manually provided
             # otherwise we re-raise
             if not schema:
                 raise ValueError(f"Failed to introspect API schema: {e}") from e
 
-    # Parse schema if provided, otherwise use defaults
-    if schema:
-        dest_schema = DestinationSchema(
-            fields=schema.get("fields", []),
-            types=schema.get("types", []),
-            constraints=schema.get("constraints", {}),
-        )
-    else:
-        dest_schema = DestinationSchema()
+    # Parse schema if provided
+    dest_schema = DestinationSchema(fields=_parse_destination_fields(schema)) if schema else DestinationSchema()
 
     return DestinationContract(
         destination_id=destination_id,
         schema=dest_schema,
         metadata=metadata,
     )
+
+
+def _create_destination_field(idx: int, field: Any, schema_types: list[str]) -> FieldDefinition:
+    """Create a FieldDefinition from various input formats."""
+    if isinstance(field, str):
+        # Fallback to "string" only if schema_types was not provided or is shorter
+        dtype = schema_types[idx] if idx < len(schema_types) else "string"
+        return FieldDefinition(name=field, data_type=dtype)
+    if isinstance(field, dict):
+        return FieldDefinition(**field)
+    if isinstance(field, FieldDefinition):
+        return field
+    return field  # type: ignore
+
+
+def _parse_destination_fields(schema: dict[str, Any]) -> list[FieldDefinition]:
+    """Parse legacy and new style destination fields into FieldDefinition objects."""
+    schema_fields = schema.get("fields", [])
+    schema_types = schema.get("types", [])
+
+    # If types is provided, check for length mismatch
+    mismatch = schema_types and (len(schema_types) != len(schema_fields))
+    if mismatch and all(isinstance(f, str) for f in schema_fields):
+        raise ValueError(
+            f"Schema mismatch: 'fields' has {len(schema_fields)} names but 'types' has {len(schema_types)} types."
+        )
+
+    return [_create_destination_field(i, f, schema_types) for i, f in enumerate(schema_fields)]
 
 
 def generate_transformation_contract(
