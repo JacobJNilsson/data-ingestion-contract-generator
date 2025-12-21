@@ -26,6 +26,20 @@ class ColumnInfo(BaseModel):
     default: str | None = Field(default=None, description="Default value for the column")
 
 
+class TableInfo(BaseModel):
+    """Information about a database table"""
+
+    table_name: str = Field(description="Table or view name")
+    db_schema: str | None = Field(default=None, description="Database schema name", alias="schema")
+    type: str = Field(description="Type of object (table or view)")
+    has_primary_key: bool = Field(default=False, description="Whether the table has a primary key")
+    primary_key_columns: list[str] = Field(default_factory=list, description="List of primary key column names")
+    row_count: int | None = Field(default=None, description="Number of rows in the table")
+    column_count: int | None = Field(default=None, description="Number of columns in the table")
+
+    model_config = {"populate_by_name": True}
+
+
 # ============================================================================
 # Source Contract Models
 # ============================================================================

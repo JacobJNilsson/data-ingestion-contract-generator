@@ -120,6 +120,11 @@ module = "core.contract_generator"
 disable_error_code = ["call-arg"]
 
 [[tool.mypy.overrides]]
+module = "core.sources.database.relationships"
+# Pydantic models with aliases
+disable_error_code = ["call-arg"]
+
+[[tool.mypy.overrides]]
 module = "cli.*"
 # Typer doesn't have complete type stubs
 disallow_untyped_decorators = false
