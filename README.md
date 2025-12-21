@@ -3,7 +3,7 @@
 [![CI](https://github.com/JacobJNilsson/data-ingestion-contract-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/JacobJNilsson/data-ingestion-contract-generator/actions/workflows/ci.yml)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
-An MCP (Model Context Protocol) server that automatically generates and validates contracts for data ingestion pipelines. Designed to help AI agents and developers build reliable, type-safe data workflows with automated schema detection and quality assessment.
+A CLI tool and framework that automatically generates and validates contracts for data ingestion pipelines. Designed to help developers and AI agents build reliable, type-safe data workflows with automated schema detection and quality assessment.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Building data ingestion pipelines is complex and error-prone, especially when de
 - Schema mismatches between source and destination
 - Transformation logic that's hard to track and maintain
 
-This MCP server solves these problems with a **three-contract architecture (version 2.0)** that separates concerns and makes data pipelines explicit, validated, and maintainable.
+This tool solves these problems with a **three-contract architecture** that separates concerns and makes data pipelines explicit, validated, and maintainable.
 
 ## Three-Contract Architecture
 
@@ -84,15 +84,20 @@ uv sync
 make test
 ```
 
-### Command Line Interface (CLI)
+## Command Line Interface (CLI)
 
 The `contract-gen` CLI provides direct access to contract generation and validation.
 
 > **For local development:** Prefix commands with `uv run` (e.g., `uv run contract-gen --help`)
 
+### Key Commands
+
 ```bash
 # Generate source contract from CSV
 contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json
+
+# Generate source contract from Database
+contract-gen source db postgresql --conn "postgresql://user:pass@localhost:5432/db" --table users --output contracts/users.json
 
 # Generate destination contract
 contract-gen destination csv --id output_data --output contracts/destination.json
@@ -107,12 +112,47 @@ contract-gen --help
 **Key features:**
 
 - Auto-detects CSV encoding and delimiters
+- Support for PostgreSQL, MySQL, and SQLite
 - Multiple output formats (JSON, YAML)
 - Pretty-printed output with syntax highlighting
 - Comprehensive validation with detailed error messages
 - Batch processing support
 
-### Using with Cursor (MCP Server)
+## Three-Contract Architecture
+
+### 1. Source Contracts
+
+Describe where data comes from. Automatically analyzes and documents:
+
+- **File sources**: CSV, JSON, and other file formats with encoding detection
+- **Database sources**: PostgreSQL, MySQL, SQLite tables and queries
+- Schema inference with data types
+- Quality metrics and data profiling
+- Format-specific handling (UTF-8 BOM, European numbers, etc.)
+
+### 2. Destination Contracts
+
+Define where data goes. Specifies:
+
+- Target schema and data types
+- Validation rules and constraints
+- Required fields and uniqueness constraints
+- Data quality requirements
+
+### 3. Transformation Contracts
+
+Map source to destination. Defines:
+
+- Field mappings between source and destination
+- Transformation logic (type conversions, formatting)
+- Enrichment rules (derived fields, lookups)
+- Execution configuration (batch size, error handling)
+
+See the [Core documentation](core/README.md) for detailed usage and examples.
+
+## AI Integration (MCP Server)
+
+This tool also functions as an MCP (Model Context Protocol) server, making its capabilities available to AI assistants like Cursor.
 
 Add to your `.cursor/mcp.json`:
 
@@ -132,7 +172,7 @@ Add to your `.cursor/mcp.json`:
 }
 ```
 
-Then restart Cursor, and the contract generation tools will be available to AI assistants.
+Then restart Cursor, and the contract generation tools will be available to the AI.
 
 ## Development
 
@@ -158,7 +198,7 @@ All code is fully typed with Python 3.13+ type hints. CI runs automatically on p
 
 ## Documentation
 
-- **[MCP Server API](core/README.md)** - Detailed tool documentation
+- **[Core Library](core/README.md)** - Detailed logic and examples
 - **[Project Architecture](.cursor/rules/project.mdc)** - Architecture decisions and conventions
 - **[Git Workflow](.cursor/rules/git.mdc)** - Commit guidelines and workflow
 - **[Python Guidelines](.cursor/rules/python.mdc)** - Coding standards
@@ -173,7 +213,7 @@ All code is fully typed with Python 3.13+ type hints. CI runs automatically on p
 
 **Interactive Development:**
 
-- Use the MCP server with Cursor for AI-assisted contract generation
+- Use with Cursor for AI-assisted contract generation
 - Real-time validation and schema analysis
 
 **Data Engineering:**
@@ -185,10 +225,10 @@ All code is fully typed with Python 3.13+ type hints. CI runs automatically on p
 ## Requirements
 
 - **Python**: 3.13+
-- **MCP**: 1.0.0+
 - **Pydantic**: 2.0.0+
 - **Typer**: 0.12.0+ (for CLI)
 - **Rich**: 13.0.0+ (for CLI pretty output)
+- **MCP**: 1.0.0+ (optional, for AI integration)
 
 See `pyproject.toml` for complete dependency list.
 
