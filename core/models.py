@@ -40,6 +40,32 @@ class TableInfo(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ForeignKeyInfo(BaseModel):
+    """Information about a foreign key constraint"""
+
+    constraint_name: str | None = Field(default=None, description="Name of the foreign key constraint")
+    columns: list[str] = Field(description="Columns in this table that form the foreign key")
+    referred_table: str = Field(description="Table that is referenced")
+    referred_columns: list[str] = Field(description="Columns in the referred table")
+    referred_schema: str | None = Field(default=None, description="Schema of the referred table")
+
+
+class ReferencedByInfo(BaseModel):
+    """Information about tables that reference this table via foreign keys"""
+
+    constraint_name: str | None = Field(default=None, description="Name of the foreign key constraint")
+    table: str = Field(description="Table that references this table")
+    columns: list[str] = Field(description="Columns in the referencing table")
+    referred_columns: list[str] = Field(description="Columns in this table that are referenced")
+
+
+class RelationshipInfo(BaseModel):
+    """Information about foreign key relationships for a table"""
+
+    foreign_keys: list[ForeignKeyInfo] = Field(default_factory=list, description="Foreign keys from this table")
+    referenced_by: list[ReferencedByInfo] = Field(default_factory=list, description="Tables that reference this table")
+
+
 # ============================================================================
 # Source Contract Models
 # ============================================================================

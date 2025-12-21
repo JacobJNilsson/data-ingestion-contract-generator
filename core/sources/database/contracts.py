@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, OperationalError
 
-from core.models import SourceContract
+from core.models import RelationshipInfo, SourceContract
 from core.sources.database.introspection import analyze_database_query, analyze_database_table
 from core.sources.database.relationships import calculate_load_order, detect_foreign_keys, list_database_tables
 
@@ -136,7 +136,7 @@ def generate_database_multi_source_contracts(
         return []
 
     # Detect relationships if requested
-    relationships_map: dict[str, dict[str, Any]] = {}
+    relationships_map: dict[str, RelationshipInfo] = {}
     table_dependencies: dict[str, list[str]] = {}
 
     if include_relationships:
@@ -151,8 +151,8 @@ def generate_database_multi_source_contracts(
 
             # Build dependency list (tables this table depends on)
             depends_on = []
-            for fk in relationships["foreign_keys"]:
-                referred_table = fk["referred_table"]
+            for fk in relationships.foreign_keys:
+                referred_table = fk.referred_table
                 if referred_table in tables:
                     depends_on.append(referred_table)
             table_dependencies[table_name] = depends_on
@@ -183,6 +183,7 @@ def generate_database_multi_source_contracts(
 
             # Add relationship metadata if available
             if include_relationships and table_name in relationships_map:
+                # Store RelationshipInfo object in metadata (will be serialized by Pydantic)
                 contract.metadata["relationships"] = relationships_map[table_name]
                 contract.metadata["load_order"] = load_order_levels.get(table_name, 1)
                 contract.metadata["depends_on"] = table_dependencies.get(table_name, [])
