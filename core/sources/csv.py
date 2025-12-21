@@ -4,7 +4,11 @@ import csv
 from pathlib import Path
 
 from core.models import SourceAnalysisResult
-from core.sources.utils import detect_data_types_from_multiple_rows, detect_file_encoding
+from core.sources.utils import (
+    detect_data_types_from_multiple_rows,
+    detect_file_encoding,
+    profile_field_data,
+)
 
 
 def detect_delimiter(file_path: str, encoding: str) -> str:
@@ -71,7 +75,14 @@ def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> SourceAnalys
 
     # Detect data types by scanning multiple rows for better accuracy
     num_columns = len(sample_fields)
-    data_types = detect_data_types_from_multiple_rows(data_rows, num_columns) if data_rows else []
+    data_types = detect_data_types_from_multiple_rows(data_rows, num_columns)
+
+    # Calculate field profiles
+    field_profiles = {}
+    if data_rows:
+        for i, field_name in enumerate(sample_fields):
+            column_data = [row[i] if i < len(row) else "" for row in data_rows]
+            field_profiles[field_name] = profile_field_data(column_data)
 
     # Count total rows (approximate)
     with source_file.open(encoding=encoding) as f:
@@ -92,6 +103,7 @@ def analyze_csv_file(source_file: Path, sample_size: int = 1000) -> SourceAnalys
         encoding=encoding,
         has_header=has_header,
         total_rows=max(0, total_rows),
+        field_profiles=field_profiles,
         sample_fields=sample_fields,
         sample_data=data_rows[:5] if data_rows else [],
         data_types=data_types,
