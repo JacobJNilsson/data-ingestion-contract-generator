@@ -98,6 +98,20 @@ class SchemaInfo(BaseModel):
     )
 
 
+class SourceAnalysisResult(BaseModel):
+    """Result of analyzing a data source file (CSV or JSON)"""
+
+    file_type: str = Field(description="Type of file (csv or json)")
+    encoding: str = Field(description="Detected file encoding")
+    delimiter: str | None = Field(default=None, description="CSV delimiter (None for JSON)")
+    has_header: bool | None = Field(default=None, description="Whether CSV has header row (None for JSON)")
+    total_rows: int = Field(description="Total number of rows/objects in the file")
+    sample_fields: list[str] = Field(description="List of field/column names")
+    sample_data: list[list[str]] = Field(default_factory=list, description="Sample data rows (first 5 rows)")
+    data_types: list[str] = Field(description="Detected data types for each field")
+    issues: list[str] = Field(default_factory=list, description="Issues or warnings detected")
+
+
 # ============================================================================
 # Source Contract Models
 # ============================================================================

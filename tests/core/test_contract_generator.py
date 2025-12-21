@@ -61,16 +61,16 @@ class TestSourceAnalysis:
         """Test that source analysis extracts correct metadata"""
         analysis = generate_source_analysis(str(sample_csv_path))
 
-        assert analysis["file_type"] == "csv"
-        assert analysis["encoding"] == "utf-8"
-        assert analysis["delimiter"] == ","
-        assert analysis["has_header"] is True
-        assert analysis["total_rows"] == 11  # Includes blank line at end of file
-        assert len(analysis["sample_fields"]) == 5
-        assert "Date" in analysis["sample_fields"]
-        assert "Amount" in analysis["sample_fields"]
-        assert len(analysis["sample_data"]) <= 5
-        assert analysis["issues"] == []
+        assert analysis.file_type == "csv"
+        assert analysis.encoding == "utf-8"
+        assert analysis.delimiter == ","
+        assert analysis.has_header is True
+        assert analysis.total_rows == 11  # Includes blank line at end of file
+        assert len(analysis.sample_fields) == 5
+        assert "Date" in analysis.sample_fields
+        assert "Amount" in analysis.sample_fields
+        assert len(analysis.sample_data) <= 5
+        assert analysis.issues == []
 
     def test_generate_source_analysis_file_not_found(self) -> None:
         """Test that source analysis raises error for missing file"""
@@ -95,11 +95,11 @@ class TestSourceAnalysis:
 
         # Test with small sample size (should mark sparse_result as empty)
         analysis_small = generate_source_analysis(str(csv_file), sample_size=10)
-        assert analysis_small["data_types"][3] == "empty"  # sparse_result column
+        assert analysis_small.data_types[3] == "empty"  # sparse_result column
 
         # Test with larger sample size (should correctly detect sparse_result as numeric)
         analysis_large = generate_source_analysis(str(csv_file), sample_size=20)
-        assert analysis_large["data_types"][3] == "numeric"  # sparse_result column
+        assert analysis_large.data_types[3] == "numeric"  # sparse_result column
 
 
 class TestSourceContractGeneration:
