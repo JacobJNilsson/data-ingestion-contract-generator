@@ -488,14 +488,14 @@ def test_detect_foreign_keys(sqlite_db: str) -> None:
         table_name="orders",
     )
 
-    assert isinstance(relationships, dict)
-    assert "foreign_keys" in relationships
-    assert "referenced_by" in relationships
+    from core.models import RelationshipInfo
+
+    assert isinstance(relationships, RelationshipInfo)
 
     # Orders should have FK to users
-    assert len(relationships["foreign_keys"]) == 1
-    fk = relationships["foreign_keys"][0]
-    assert fk["referred_table"] == "users"
+    assert len(relationships.foreign_keys) == 1
+    fk = relationships.foreign_keys[0]
+    assert fk.referred_table == "users"
 
 
 def test_detect_foreign_keys_referenced_by(sqlite_db: str) -> None:
@@ -507,9 +507,9 @@ def test_detect_foreign_keys_referenced_by(sqlite_db: str) -> None:
         table_name="users",
     )
 
-    assert len(relationships["referenced_by"]) == 1
-    ref = relationships["referenced_by"][0]
-    assert ref["table"] == "orders"
+    assert len(relationships.referenced_by) == 1
+    ref = relationships.referenced_by[0]
+    assert ref.table == "orders"
 
 
 def test_calculate_load_order_simple() -> None:
@@ -618,11 +618,17 @@ def test_generate_database_multi_source_contracts_with_relationships(sqlite_db: 
     assert "load_order" in users_contract.metadata
     assert "depends_on" in users_contract.metadata
 
+    from core.models import RelationshipInfo
+
     # Users should be referenced by orders
-    assert len(users_contract.metadata["relationships"]["referenced_by"]) == 1
+    users_relationships = users_contract.metadata["relationships"]
+    assert isinstance(users_relationships, RelationshipInfo)
+    assert len(users_relationships.referenced_by) == 1
 
     # Orders should have FK to users
-    assert len(orders_contract.metadata["relationships"]["foreign_keys"]) == 1
+    orders_relationships = orders_contract.metadata["relationships"]
+    assert isinstance(orders_relationships, RelationshipInfo)
+    assert len(orders_relationships.foreign_keys) == 1
 
     # Users should load before orders
     assert users_contract.metadata["load_order"] < orders_contract.metadata["load_order"]

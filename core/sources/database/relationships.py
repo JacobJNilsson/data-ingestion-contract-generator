@@ -1,12 +1,11 @@
 """Database relationship analysis and table listing."""
 
 import logging
-from typing import Any
 
 from sqlalchemy import MetaData, Table, inspect, select, text
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, OperationalError
 
-from core.models import TableInfo
+from core.models import ForeignKeyInfo, ReferencedByInfo, RelationshipInfo, TableInfo
 from core.sources.database.engine import create_database_engine
 
 logger = logging.getLogger(__name__)
@@ -138,7 +137,7 @@ def detect_foreign_keys(
     database_type: str,
     table_name: str,
     schema: str | None = None,
-) -> dict[str, Any]:
+) -> RelationshipInfo:
     """Detect foreign key relationships for a table.
 
     Args:
@@ -159,23 +158,21 @@ def detect_foreign_keys(
         if database_type == "postgresql" and schema is None:
             schema = "public"
 
-        relationships: dict[str, Any] = {
-            "foreign_keys": [],
-            "referenced_by": [],
-        }
+        foreign_keys: list[ForeignKeyInfo] = []
+        referenced_by: list[ReferencedByInfo] = []
 
         # Get foreign keys from this table to other tables
         try:
             fks = inspector.get_foreign_keys(table_name, schema=schema)
             for fk in fks:
-                relationships["foreign_keys"].append(
-                    {
-                        "constraint_name": fk.get("name"),
-                        "columns": fk.get("constrained_columns", []),
-                        "referred_table": fk.get("referred_table"),
-                        "referred_columns": fk.get("referred_columns", []),
-                        "referred_schema": fk.get("referred_schema"),
-                    }
+                foreign_keys.append(
+                    ForeignKeyInfo(
+                        constraint_name=fk.get("name"),
+                        columns=fk.get("constrained_columns", []),
+                        referred_table=fk.get("referred_table"),
+                        referred_columns=fk.get("referred_columns", []),
+                        referred_schema=fk.get("referred_schema"),
+                    )
                 )
         except NotImplementedError:
             # Some databases don't support FK introspection
@@ -195,13 +192,13 @@ def detect_foreign_keys(
                     other_fks = inspector.get_foreign_keys(other_table, schema=schema)
                     for fk in other_fks:
                         if fk.get("referred_table") == table_name:
-                            relationships["referenced_by"].append(
-                                {
-                                    "constraint_name": fk.get("name"),
-                                    "table": other_table,
-                                    "columns": fk.get("constrained_columns", []),
-                                    "referred_columns": fk.get("referred_columns", []),
-                                }
+                            referenced_by.append(
+                                ReferencedByInfo(
+                                    constraint_name=fk.get("name"),
+                                    table=other_table,
+                                    columns=fk.get("constrained_columns", []),
+                                    referred_columns=fk.get("referred_columns", []),
+                                )
                             )
                 except (NoSuchTableError, DatabaseError) as e:
                     logger.debug(f"Could not inspect FKs for table '{other_table}': {e}")
@@ -212,7 +209,7 @@ def detect_foreign_keys(
         except Exception as e:
             logger.error(f"Unexpected error finding reverse foreign keys: {e}", exc_info=True)
 
-        return relationships
+        return RelationshipInfo(foreign_keys=foreign_keys, referenced_by=referenced_by)
 
     finally:
         engine.dispose()
