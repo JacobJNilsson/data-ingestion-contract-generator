@@ -156,11 +156,12 @@ def generate_destination_contract(
         try:
             schema_path = Path(schema_file)
             openapi_spec = parse_openapi_schema(schema_path)
-            api_schema = extract_endpoint_schema(
+            api_schema_info = extract_endpoint_schema(
                 openapi_spec,
                 endpoint=endpoint,
                 method=http_method or "POST",
             )
+            api_schema = api_schema_info.model_dump(exclude_none=True)
 
             # Store API metadata
             metadata["destination_type"] = "api"
