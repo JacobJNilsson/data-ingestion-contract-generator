@@ -45,7 +45,7 @@ class ForeignKeyInfo(BaseModel):
 
     constraint_name: str | None = Field(default=None, description="Name of the foreign key constraint")
     columns: list[str] = Field(description="Columns in this table that form the foreign key")
-    referred_table: str = Field(description="Table that is referenced")
+    referred_table: str | None = Field(default=None, description="Table that is referenced (None if invalid FK)")
     referred_columns: list[str] = Field(description="Columns in the referred table")
     referred_schema: str | None = Field(default=None, description="Schema of the referred table")
 
@@ -64,6 +64,38 @@ class RelationshipInfo(BaseModel):
 
     foreign_keys: list[ForeignKeyInfo] = Field(default_factory=list, description="Foreign keys from this table")
     referenced_by: list[ReferencedByInfo] = Field(default_factory=list, description="Tables that reference this table")
+
+
+class TableMetadata(BaseModel):
+    """Metadata for a database table analysis"""
+
+    database_type: str = Field(description="Database type (postgresql, mysql, sqlite)")
+    table_name: str = Field(description="Table name")
+    db_schema: str | None = Field(default=None, description="Database schema name")
+    primary_keys: list[str] = Field(default_factory=list, description="List of primary key column names")
+    column_count: int = Field(description="Number of columns in the table")
+    nullable_columns: list[str] = Field(default_factory=list, description="List of nullable column names")
+    sample_size: int = Field(description="Number of rows sampled for analysis")
+    columns: list[ColumnInfo] = Field(default_factory=list, description="Detailed column information")
+
+
+class QueryMetadata(BaseModel):
+    """Metadata for a database query analysis"""
+
+    database_type: str = Field(description="Database type (postgresql, mysql, sqlite)")
+    query: str = Field(description="SQL query that was analyzed")
+    column_count: int = Field(description="Number of columns in the query result")
+    sample_size: int = Field(description="Number of rows sampled for analysis")
+
+
+class SchemaInfo(BaseModel):
+    """Schema information extracted from a source (table or API)"""
+
+    fields: list[str] = Field(description="List of column/field names")
+    types: list[str] = Field(description="List of data types")
+    constraints: dict[str, list[str]] = Field(
+        default_factory=dict, description="Constraints (field_name -> list of constraint strings)"
+    )
 
 
 # ============================================================================

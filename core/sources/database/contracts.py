@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, OperationalError
 
-from core.models import RelationshipInfo, SourceContract
+from core.models import QueryMetadata, RelationshipInfo, SourceContract, TableMetadata
 from core.sources.database.introspection import analyze_database_query, analyze_database_table
 from core.sources.database.relationships import calculate_load_order, detect_foreign_keys, list_database_tables
 
@@ -56,6 +56,7 @@ def generate_database_source_contract(
         raise ValueError(f"Unsupported database_type: {database_type}. Must be 'postgresql', 'mysql', or 'sqlite'")
 
     # Analyze the database
+    metadata: TableMetadata | QueryMetadata
     if source_type in ("table", "view"):
         source_schema, quality_metrics, metadata = analyze_database_table(
             connection_string=connection_string,
@@ -72,9 +73,10 @@ def generate_database_source_contract(
             sample_size=sample_size,
         )
 
-    # Add any additional config to metadata
+    # Convert metadata to dict and merge with config
+    metadata_dict = metadata.model_dump(exclude_none=True)
     if config:
-        metadata.update(config)
+        metadata_dict.update(config)
 
     # Create source contract
     # Using schema parameter (alias) instead of data_schema to satisfy Pydantic
@@ -86,7 +88,7 @@ def generate_database_source_contract(
         database_schema=schema,
         schema=source_schema,
         quality_metrics=quality_metrics,
-        metadata=metadata,
+        metadata=metadata_dict,
     )
 
     return contract

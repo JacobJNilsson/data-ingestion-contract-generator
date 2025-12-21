@@ -6,7 +6,7 @@ import typer
 
 from cli.output import error_message, output_contract
 from core.contract_generator import generate_source_contract
-from core.sources.database.introspection import extract_table_list
+from core.sources.database.relationships import list_database_tables
 
 app = typer.Typer(help="Generate source contracts from data sources")
 database_app = typer.Typer(help="Generate source contracts from databases")
@@ -184,12 +184,14 @@ def source_database_list(
         contract-gen source database list postgresql://user:pass@host/db --type postgresql
     """
     try:
-        tables = extract_table_list(
+        table_infos = list_database_tables(
             connection_string=connection_string,
             database_type=database_type,
             schema=schema,
-            with_fields=with_fields,
+            include_views=True,
         )
+        # Convert to dicts for output handling
+        tables = [t.model_dump(exclude_none=True) for t in table_infos]
 
         if output_format == "json":
             import json

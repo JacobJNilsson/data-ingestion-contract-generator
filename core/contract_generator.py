@@ -129,13 +129,14 @@ def generate_destination_contract(
         from core.sources.database import inspect_table_schema
 
         try:
-            db_schema = inspect_table_schema(
+            db_schema_info = inspect_table_schema(
                 connection_string=connection_string,
                 database_type=database_type,
                 table_name=table_name,
                 schema=database_schema,
             )
-            # Merge with provided schema if any (provided schema takes precedence)
+            # Convert to dict and merge with provided schema if any (provided schema takes precedence)
+            db_schema = db_schema_info.model_dump(exclude_none=True)
             if schema:
                 db_schema.update(schema)
             schema = db_schema
