@@ -165,11 +165,15 @@ def detect_foreign_keys(
         try:
             fks = inspector.get_foreign_keys(table_name, schema=schema)
             for fk in fks:
+                referred_table = fk.get("referred_table")
+                # Skip invalid FKs without a referred table
+                if referred_table is None:
+                    continue
                 foreign_keys.append(
                     ForeignKeyInfo(
                         constraint_name=fk.get("name"),
                         columns=fk.get("constrained_columns", []),
-                        referred_table=fk.get("referred_table"),
+                        referred_table=referred_table,
                         referred_columns=fk.get("referred_columns", []),
                         referred_schema=fk.get("referred_schema"),
                     )

@@ -1,10 +1,8 @@
 """Database schema introspection utilities."""
 
-from typing import Any
-
 from sqlalchemy import MetaData, Table, inspect, select, text
 
-from core.models import ColumnInfo, QualityMetrics, SourceSchema
+from core.models import ColumnInfo, QualityMetrics, QueryMetadata, SchemaInfo, SourceSchema, TableMetadata
 from core.sources.database.engine import create_database_engine
 from core.sources.database.type_mapping import map_database_type_to_contract_type
 
@@ -15,7 +13,7 @@ def analyze_database_table(
     source_name: str,
     schema: str | None = None,
     sample_size: int = 1000,
-) -> tuple[SourceSchema, QualityMetrics, dict[str, Any]]:
+) -> tuple[SourceSchema, QualityMetrics, TableMetadata]:
     """Analyze a database table and extract schema, quality metrics, and metadata.
 
     Args:
@@ -91,17 +89,6 @@ def analyze_database_table(
             issues=issues,
         )
 
-        # Additional metadata
-        table_metadata: dict[str, Any] = {
-            "database_type": database_type,
-            "table_name": source_name,
-            "schema": schema,
-            "primary_keys": primary_keys,
-            "column_count": len(field_names),
-            "nullable_columns": nullable_columns,
-            "sample_size": len(sample_rows),
-        }
-
         # Add column details
         column_details = [
             ColumnInfo(
@@ -112,7 +99,18 @@ def analyze_database_table(
             )
             for col in columns
         ]
-        table_metadata["columns"] = column_details
+
+        # Create metadata (using db_schema field name, not alias)
+        table_metadata = TableMetadata(
+            database_type=database_type,
+            table_name=source_name,
+            db_schema=schema,
+            primary_keys=primary_keys,
+            column_count=len(field_names),
+            nullable_columns=nullable_columns,
+            sample_size=len(sample_rows),
+            columns=column_details,
+        )
 
         return source_schema, quality_metrics, table_metadata
 
@@ -125,7 +123,7 @@ def inspect_table_schema(
     database_type: str,
     table_name: str,
     schema: str | None = None,
-) -> dict[str, Any]:
+) -> SchemaInfo:
     """Inspect a database table and return its schema for destination contracts.
 
     Args:
@@ -135,7 +133,7 @@ def inspect_table_schema(
         schema: Database schema name (optional, defaults to 'public' for PostgreSQL)
 
     Returns:
-        Dictionary containing fields, types, and constraints
+        SchemaInfo containing fields, types, and constraints
 
     Raises:
         ValueError: If table is not found
@@ -179,11 +177,11 @@ def inspect_table_schema(
             if col_constraints:
                 constraints[name] = col_constraints
 
-        return {
-            "fields": fields,
-            "types": types,
-            "constraints": constraints,
-        }
+        return SchemaInfo(
+            fields=fields,
+            types=types,
+            constraints=constraints,
+        )
 
     finally:
         engine.dispose()
@@ -194,7 +192,7 @@ def analyze_database_query(
     database_type: str,
     query: str,
     sample_size: int = 1000,
-) -> tuple[SourceSchema, QualityMetrics, dict[str, Any]]:
+) -> tuple[SourceSchema, QualityMetrics, QueryMetadata]:
     """Analyze a SQL query result and extract schema and quality metrics.
 
     Args:
@@ -270,76 +268,15 @@ def analyze_database_query(
                 issues=issues,
             )
 
-            # Additional metadata
-            query_metadata: dict[str, Any] = {
-                "database_type": database_type,
-                "query": query,
-                "column_count": len(field_names),
-                "sample_size": len(sample_rows),
-            }
+            # Create metadata
+            query_metadata = QueryMetadata(
+                database_type=database_type,
+                query=query,
+                column_count=len(field_names),
+                sample_size=len(sample_rows),
+            )
 
             return source_schema, quality_metrics, query_metadata
 
-    finally:
-        engine.dispose()
-
-
-def _get_table_column_info(inspector: Any, table_name: str, schema: str | None, with_fields: bool) -> dict[str, Any]:
-    """Get column information for a table.
-
-    Args:
-        inspector: SQLAlchemy inspector instance
-        table_name: Name of the table
-        schema: Database schema name
-        with_fields: Whether to include full column details
-
-    Returns:
-        Dictionary with column_count and optionally columns list
-    """
-    try:
-        columns = inspector.get_columns(table_name, schema=schema)
-        result: dict[str, Any] = {"column_count": len(columns)}
-        if with_fields:
-            result["columns"] = [
-                ColumnInfo(
-                    name=col["name"],
-                    type=str(col["type"]),
-                    nullable=col.get("nullable", True),
-                )
-                for col in columns
-            ]
-        return result
-    except Exception:
-        return {"column_count": 0, "error": "Failed to inspect columns"} if with_fields else {"column_count": 0}
-
-
-def extract_table_list(
-    connection_string: str,
-    database_type: str,
-    schema: str | None = None,
-    with_fields: bool = False,
-) -> list[dict[str, Any]]:
-    """List tables in the database with optional field details.
-
-    Args:
-        connection_string: Database connection string
-        database_type: Database type (postgresql, mysql, sqlite)
-        schema: Database schema name (optional)
-        with_fields: Whether to include column details
-
-    Returns:
-        List of dictionaries containing table 'name' and optional 'columns'
-    """
-    engine = create_database_engine(connection_string, database_type)
-
-    try:
-        inspector = inspect(engine)
-        effective_schema = "public" if database_type == "postgresql" and schema is None else schema
-        table_names = inspector.get_table_names(schema=effective_schema)
-
-        return [
-            {"name": table_name, **_get_table_column_info(inspector, table_name, effective_schema, with_fields)}
-            for table_name in table_names
-        ]
     finally:
         engine.dispose()
