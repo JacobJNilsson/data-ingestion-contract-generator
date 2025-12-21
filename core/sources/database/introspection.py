@@ -2,7 +2,16 @@
 
 from sqlalchemy import MetaData, Table, inspect, select, text
 
-from core.models import ColumnInfo, QualityMetrics, QueryMetadata, SchemaInfo, SourceSchema, TableMetadata
+from core.models import (
+    ColumnInfo,
+    FieldConstraint,
+    FieldDefinition,
+    QualityObservation,
+    QueryMetadata,
+    SchemaInfo,
+    SourceSchema,
+    TableMetadata,
+)
 from core.sources.database.engine import create_database_engine
 from core.sources.database.type_mapping import map_database_type_to_contract_type
 
@@ -13,7 +22,7 @@ def analyze_database_table(
     source_name: str,
     schema: str | None = None,
     sample_size: int = 1000,
-) -> tuple[SourceSchema, QualityMetrics, TableMetadata]:
+) -> tuple[SourceSchema, QualityObservation, TableMetadata]:
     """Analyze a database table and extract schema, quality metrics, and metadata.
 
     Args:
@@ -43,13 +52,23 @@ def analyze_database_table(
 
         # Get table columns
         columns = inspector.get_columns(source_name, schema=schema)
-
-        # Extract field names and types
         field_names = [col["name"] for col in columns]
-        data_types = [map_database_type_to_contract_type(str(col["type"]), database_type) for col in columns]
+
+        # Create field definitions
+        fields = []
+        for col in columns:
+            name = col["name"]
+            data_type = map_database_type_to_contract_type(str(col["type"]), database_type)
+            nullable = col.get("nullable", True)
+
+            constraints = []
+            if not nullable:
+                constraints.append(FieldConstraint(type="not_null"))
+
+            fields.append(FieldDefinition(name=name, data_type=data_type, nullable=nullable, constraints=constraints))
 
         # Create schema
-        source_schema = SourceSchema(fields=field_names, data_types=data_types)
+        source_schema = SourceSchema(fields=fields)
 
         # Get primary key info
         pk_constraint = inspector.get_pk_constraint(source_name, schema=schema)
@@ -83,7 +102,7 @@ def analyze_database_table(
         if nullable_columns:
             issues.append(f"Nullable columns: {', '.join(nullable_columns[:5])}")
 
-        quality_metrics = QualityMetrics(
+        quality_observation = QualityObservation(
             total_rows=total_rows,
             sample_data=sample_data,
             issues=issues,
@@ -112,7 +131,7 @@ def analyze_database_table(
             columns=column_details,
         )
 
-        return source_schema, quality_metrics, table_metadata
+        return source_schema, quality_observation, table_metadata
 
     finally:
         engine.dispose()
@@ -154,34 +173,25 @@ def inspect_table_schema(
         # Get table columns
         columns = inspector.get_columns(table_name, schema=schema)
         pk_constraint = inspector.get_pk_constraint(table_name, schema=schema)
-
-        fields = []
-        types = []
-        constraints = {}
-
         pk_columns = set(pk_constraint.get("constrained_columns", []))
 
+        field_definitions = []
         for col in columns:
             name = col["name"]
             col_type = str(col["type"])
+            nullable = col.get("nullable", True)
 
-            fields.append(name)
-            types.append(col_type)
-
-            col_constraints = []
-            if not col.get("nullable", True):
-                col_constraints.append("NOT NULL")
+            constraints = []
+            if not nullable:
+                constraints.append(FieldConstraint(type="not_null"))
             if name in pk_columns:
-                col_constraints.append("PRIMARY KEY")
+                constraints.append(FieldConstraint(type="primary_key"))
 
-            if col_constraints:
-                constraints[name] = col_constraints
+            field_definitions.append(
+                FieldDefinition(name=name, data_type=col_type, nullable=nullable, constraints=constraints)
+            )
 
-        return SchemaInfo(
-            fields=fields,
-            types=types,
-            constraints=constraints,
-        )
+        return SchemaInfo(fields=field_definitions)
 
     finally:
         engine.dispose()
@@ -192,7 +202,7 @@ def analyze_database_query(
     database_type: str,
     query: str,
     sample_size: int = 1000,
-) -> tuple[SourceSchema, QualityMetrics, QueryMetadata]:
+) -> tuple[SourceSchema, QualityObservation, QueryMetadata]:
     """Analyze a SQL query result and extract schema and quality metrics.
 
     Args:
@@ -243,8 +253,13 @@ def analyze_database_query(
                 else:
                     data_types.append("text")
 
+            # Create field definitions
+            fields = []
+            for i, name in enumerate(field_names):
+                fields.append(FieldDefinition(name=name, data_type=data_types[i]))
+
             # Create schema
-            source_schema = SourceSchema(fields=field_names, data_types=data_types)
+            source_schema = SourceSchema(fields=fields)
 
             # Convert sample data to list of lists of strings
             sample_data = [[str(val) if val is not None else "" for val in row] for row in sample_rows[:10]]
@@ -262,7 +277,7 @@ def analyze_database_query(
             if total_rows == 0:
                 issues.append("Query returned no results")
 
-            quality_metrics = QualityMetrics(
+            quality_observation = QualityObservation(
                 total_rows=total_rows,
                 sample_data=sample_data,
                 issues=issues,
@@ -276,7 +291,7 @@ def analyze_database_query(
                 sample_size=len(sample_rows),
             )
 
-            return source_schema, quality_metrics, query_metadata
+            return source_schema, quality_observation, query_metadata
 
     finally:
         engine.dispose()

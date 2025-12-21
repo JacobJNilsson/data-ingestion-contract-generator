@@ -58,7 +58,7 @@ def generate_database_source_contract(
     # Analyze the database
     metadata: TableMetadata | QueryMetadata
     if source_type in ("table", "view"):
-        source_schema, quality_metrics, metadata = analyze_database_table(
+        source_schema, quality_observation, metadata = analyze_database_table(
             connection_string=connection_string,
             database_type=database_type,
             source_name=source_name,  # type: ignore
@@ -66,7 +66,7 @@ def generate_database_source_contract(
             sample_size=sample_size,
         )
     else:  # query
-        source_schema, quality_metrics, metadata = analyze_database_query(
+        source_schema, quality_observation, metadata = analyze_database_query(
             connection_string=connection_string,
             database_type=database_type,
             query=query,  # type: ignore
@@ -87,7 +87,7 @@ def generate_database_source_contract(
         source_name=source_name,
         database_schema=schema,
         schema=source_schema,
-        quality_metrics=quality_metrics,
+        quality=quality_observation,
         metadata=metadata_dict,
     )
 
