@@ -29,7 +29,7 @@ def destination_csv(
         contract = generate_destination_contract(destination_id=destination_id, config=None)
 
         # Output
-        contract_json = contract.model_dump_json(by_alias=True)
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
     except ValueError as e:
@@ -84,7 +84,7 @@ def destination_database(
         )
 
         # Output
-        contract_json = contract.model_dump_json(by_alias=True)
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
     except ValueError as e:
@@ -143,7 +143,7 @@ def generate_api_contract(
         )
 
         # Output
-        contract_json = contract.model_dump_json(by_alias=True)
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
     except ValueError as e:

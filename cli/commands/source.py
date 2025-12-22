@@ -71,7 +71,7 @@ def source_csv(
         contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
 
         # Output
-        contract_json = contract.model_dump_json(by_alias=True)
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
     except FileNotFoundError:
@@ -146,7 +146,7 @@ def source_json(
         contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
 
         # Output
-        contract_json = contract.model_dump_json(by_alias=True)
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
     except FileNotFoundError:
