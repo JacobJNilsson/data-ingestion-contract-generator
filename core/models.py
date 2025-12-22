@@ -1,8 +1,9 @@
 """Pydantic models for ingestion contracts"""
 
+import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # ============================================================================
 # Utility Models
@@ -226,23 +227,11 @@ class QualityMetrics(BaseModel):
     issues: list[str] = Field(default_factory=list, description="List of quality issues detected")
 
 
-class SourceContract(BaseModel):
-    """Contract describing a data source"""
+class BaseSourceContract(BaseModel):
+    """Base contract for all data sources"""
 
     contract_type: Literal["source"] = Field(default="source", description="Type of contract")
-    source_id: str = Field(description="Unique identifier for this source (auto-generated if not provided)")
-    # File-based sources
-    source_path: str | None = Field(default=None, description="Path to the source data file")
-    file_format: str | None = Field(default=None, description="File format (csv, json, parquet, etc.)")
-    encoding: str | None = Field(default="utf-8", description="File encoding")
-    delimiter: str | None = Field(default=None, description="Delimiter for CSV files")
-    has_header: bool | None = Field(default=True, description="Whether the file has a header row")
-    # Database-based sources
-    database_type: str | None = Field(default=None, description="Database type (postgresql, mysql, sqlite)")
-    source_type: str | None = Field(default=None, description="Source type (table, view, query)")
-    source_name: str | None = Field(default=None, description="Table or view name")
-    database_schema: str | None = Field(default=None, description="Database schema name")
-    # Common fields
+    source_id: str = Field(description="Unique identifier for this source")
     data_schema: SourceSchema = Field(description="Schema information", alias="schema")
     quality: QualityObservation = Field(description="Quality assessment")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
@@ -259,6 +248,67 @@ class SourceContract(BaseModel):
         kwargs.setdefault("exclude_defaults", False)
         kwargs.setdefault("by_alias", True)
         return super().model_dump(*args, **kwargs)
+
+
+class CSVSourceContract(BaseSourceContract):
+    """Contract for CSV data sources"""
+
+    source_format: Literal["csv"] = Field(default="csv", description="CSV format")
+    source_path: str = Field(description="Path to the CSV file")
+    encoding: str = Field(default="utf-8", description="File encoding")
+    delimiter: str = Field(description="CSV delimiter character")
+    has_header: bool = Field(default=True, description="Whether the file has a header row")
+
+
+class JSONSourceContract(BaseSourceContract):
+    """Contract for JSON/NDJSON data sources"""
+
+    source_format: Literal["json"] = Field(default="json", description="JSON format")
+    source_path: str = Field(description="Path to the JSON file")
+    encoding: str = Field(default="utf-8", description="File encoding")
+    is_ndjson: bool = Field(default=False, description="Whether file is newline-delimited JSON")
+
+
+class DatabaseSourceContract(BaseSourceContract):
+    """Contract for database data sources"""
+
+    source_format: Literal["database"] = Field(default="database", description="Database format")
+    database_type: Literal["postgresql", "mysql", "sqlite"] = Field(description="Database type")
+    source_type: Literal["table", "view", "query"] = Field(description="Type of database source")
+    source_name: str = Field(description="Table, view, or query name")
+    database_schema: str | None = Field(default=None, description="Database schema name (if applicable)")
+
+
+# Type alias for all source contract types (use for type hints)
+AnySourceContract = CSVSourceContract | JSONSourceContract | DatabaseSourceContract
+
+
+# Helper function for validation from dict/JSON
+def validate_source_contract(data: dict[str, Any] | str) -> AnySourceContract:
+    """Validate and parse a source contract from dict or JSON string.
+
+    Uses source_format field to dispatch to the correct subtype.
+    """
+    parsed_data: dict[str, Any] = json.loads(data) if isinstance(data, str) else data
+
+    source_format = parsed_data.get("source_format")
+    if source_format == "csv":
+        return CSVSourceContract.model_validate(parsed_data)
+    elif source_format == "json":
+        return JSONSourceContract.model_validate(parsed_data)
+    elif source_format == "database":
+        return DatabaseSourceContract.model_validate(parsed_data)
+    else:
+        raise ValidationError.from_exception_data(
+            title="Source Contract Validation Error",
+            line_errors=[
+                {
+                    "type": "literal_error",
+                    "loc": ("source_format",),
+                    "input": source_format,
+                }
+            ],
+        )
 
 
 # ============================================================================
@@ -350,4 +400,4 @@ class TransformationContract(BaseModel):
 # Type Alias for Any Contract
 # ============================================================================
 
-Contract = SourceContract | DestinationContract | TransformationContract
+Contract = AnySourceContract | DestinationContract | TransformationContract
