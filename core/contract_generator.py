@@ -47,28 +47,42 @@ def generate_source_analysis(source_path: str, sample_size: int = 1000) -> Sourc
     return analyze_csv_file(source_file, sample_size=sample_size)
 
 
-def generate_source_contract(
-    source_path: str, source_id: str | None = None, config: dict[str, Any] | None = None
-) -> CSVSourceContract | JSONSourceContract:
-    """Generate a source contract describing a data source
+def generate_csv_source_contract(
+    source_path: str,
+    source_id: str | None = None,
+    delimiter: str | None = None,
+    encoding: str | None = None,
+    sample_size: int = 1000,
+    config: dict[str, Any] | None = None,
+) -> CSVSourceContract:
+    """Generate a source contract for a CSV file - no type discovery needed
 
     Args:
-        source_path: Path to source data file
+        source_path: Path to CSV file
         source_id: Unique identifier for this source (e.g., 'swedish_bank_csv').
                    If not provided, will be auto-generated from the file name.
-        config: Optional configuration dictionary (can include 'sample_size')
+        delimiter: CSV delimiter (optional, will be auto-detected if not provided)
+        encoding: File encoding (optional, will be auto-detected if not provided)
+        sample_size: Number of rows to sample for analysis (default: 1000)
+        config: Optional configuration dictionary
 
     Returns:
-        CSVSourceContract or JSONSourceContract based on file type
+        CSVSourceContract
     """
-    # Extract sample_size from config, default to 1000
-    sample_size = config.get("sample_size", 1000) if config else 1000
+    source_file = Path(source_path)
+    if not source_file.exists():
+        msg = f"Source file not found: {source_path}"
+        raise FileNotFoundError(msg)
 
-    source_analysis = generate_source_analysis(source_path, sample_size=sample_size)
+    # Analyze CSV file directly - no type discovery needed
+    source_analysis = analyze_csv_file(source_file, sample_size=sample_size)
+
+    # Override detected values if explicitly provided
+    final_delimiter = delimiter if delimiter is not None else source_analysis.delimiter
+    final_encoding = encoding if encoding is not None else source_analysis.encoding
 
     # Auto-generate source_id from file name if not provided
     if source_id is None:
-        source_file = Path(source_path)
         # Use stem (filename without extension) and sanitize it
         source_id = source_file.stem.lower().replace(" ", "_").replace("-", "_")
 
@@ -78,7 +92,7 @@ def generate_source_contract(
         profile = source_analysis.field_profiles.get(name)
         fields.append(FieldDefinition(name=name, data_type=dtype, profiling=profile))
 
-    # Create the appropriate contract subtype based on file type
+    # Create the contract
     schema = SourceSchema(fields=fields)
     quality = QualityObservation(
         total_rows=source_analysis.total_rows,
@@ -88,32 +102,82 @@ def generate_source_contract(
     )
     metadata = config or {}
 
-    if source_analysis.file_type == "csv":
-        return CSVSourceContract(
-            source_id=source_id,
-            source_path=str(source_path),
-            encoding=source_analysis.encoding,
-            delimiter=source_analysis.delimiter or ",",
-            has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
-            schema=schema,
-            quality=quality,
-            metadata=metadata,
-        )
-    elif source_analysis.file_type == "json":
-        # Determine if NDJSON based on file extension
-        is_ndjson = Path(source_path).suffix.lower() in [".jsonl", ".ndjson"]
-        return JSONSourceContract(
-            source_id=source_id,
-            source_path=str(source_path),
-            encoding=source_analysis.encoding,
-            is_ndjson=is_ndjson,
-            schema=schema,
-            quality=quality,
-            metadata=metadata,
-        )
-    else:
-        msg = f"Unsupported file type: {source_analysis.file_type}"
-        raise ValueError(msg)
+    return CSVSourceContract(
+        source_id=source_id,
+        source_path=str(source_path),
+        encoding=final_encoding,
+        delimiter=final_delimiter or ",",
+        has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
+        schema=schema,
+        quality=quality,
+        metadata=metadata,
+    )
+
+
+def generate_json_source_contract(
+    source_path: str,
+    source_id: str | None = None,
+    encoding: str | None = None,
+    sample_size: int = 1000,
+    config: dict[str, Any] | None = None,
+) -> JSONSourceContract:
+    """Generate a source contract for a JSON/NDJSON file - no type discovery needed
+
+    Args:
+        source_path: Path to JSON/NDJSON file
+        source_id: Unique identifier for this source (e.g., 'users_json').
+                   If not provided, will be auto-generated from the file name.
+        encoding: File encoding (optional, will be auto-detected if not provided)
+        sample_size: Number of objects to sample for analysis (default: 1000)
+        config: Optional configuration dictionary
+
+    Returns:
+        JSONSourceContract
+    """
+    source_file = Path(source_path)
+    if not source_file.exists():
+        msg = f"Source file not found: {source_path}"
+        raise FileNotFoundError(msg)
+
+    # Analyze JSON file directly - no type discovery needed
+    source_analysis = analyze_json_file(source_file, sample_size=sample_size)
+
+    # Override detected encoding if explicitly provided
+    final_encoding = encoding if encoding is not None else source_analysis.encoding
+
+    # Auto-generate source_id from file name if not provided
+    if source_id is None:
+        # Use stem (filename without extension) and sanitize it
+        source_id = source_file.stem.lower().replace(" ", "_").replace("-", "_")
+
+    # Create field definitions
+    fields = []
+    for name, dtype in zip(source_analysis.sample_fields, source_analysis.data_types, strict=True):
+        profile = source_analysis.field_profiles.get(name)
+        fields.append(FieldDefinition(name=name, data_type=dtype, profiling=profile))
+
+    # Determine if NDJSON based on file extension or analysis result
+    is_ndjson = source_file.suffix.lower() in [".jsonl", ".ndjson"] or source_analysis.file_type == "ndjson"
+
+    # Create the contract
+    schema = SourceSchema(fields=fields)
+    quality = QualityObservation(
+        total_rows=source_analysis.total_rows,
+        observed_profiling=source_analysis.field_profiles,
+        sample_data=source_analysis.sample_data,
+        issues=source_analysis.issues,
+    )
+    metadata = config or {}
+
+    return JSONSourceContract(
+        source_id=source_id,
+        source_path=str(source_path),
+        encoding=final_encoding,
+        is_ndjson=is_ndjson,
+        schema=schema,
+        quality=quality,
+        metadata=metadata,
+    )
 
 
 def generate_destination_contract(

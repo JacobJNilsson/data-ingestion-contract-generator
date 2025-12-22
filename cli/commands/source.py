@@ -5,7 +5,10 @@ from pathlib import Path
 import typer
 
 from cli.output import error_message, handle_permission_error, output_contract
-from core.contract_generator import generate_source_contract
+from core.contract_generator import (
+    generate_csv_source_contract,
+    generate_json_source_contract,
+)
 from core.models import TableInfo
 from core.sources.database.relationships import list_database_tables
 
@@ -56,19 +59,15 @@ def source_csv(
         if pretty is None:
             pretty = output_defaults.pretty
 
-        # Build config dict with sample_size for analysis
-        # delimiter and encoding will be auto-detected by the analyzer
-        config_dict: dict[str, str | int] = {"sample_size": sample_size}
-
-        # If user explicitly provided delimiter or encoding, add them to config as overrides
-        # These will be used by the analyzer instead of auto-detection
-        if delimiter is not None:
-            config_dict["delimiter"] = delimiter
-        if encoding is not None:
-            config_dict["encoding"] = encoding
-
-        # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        # Generate contract using type-specific function - no type discovery needed
+        contract = generate_csv_source_contract(
+            source_path=str(path.absolute()),
+            source_id=source_id,
+            delimiter=delimiter,
+            encoding=encoding,
+            sample_size=sample_size,
+            config=None,
+        )
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
@@ -133,17 +132,14 @@ def source_json(
         if pretty is None:
             pretty = output_defaults.pretty
 
-        # Build config dict with sample_size for analysis
-        # encoding will be auto-detected by the analyzer
-        config_dict: dict[str, str | int] = {"sample_size": sample_size}
-
-        # If user explicitly provided encoding, add it to config as an override
-        # This will be used by the analyzer instead of auto-detection
-        if encoding is not None:
-            config_dict["encoding"] = encoding
-
-        # Generate contract
-        contract = generate_source_contract(source_path=str(path.absolute()), source_id=source_id, config=config_dict)
+        # Generate contract using type-specific function - no type discovery needed
+        contract = generate_json_source_contract(
+            source_path=str(path.absolute()),
+            source_id=source_id,
+            encoding=encoding,
+            sample_size=sample_size,
+            config=None,
+        )
 
         # Output
         contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
