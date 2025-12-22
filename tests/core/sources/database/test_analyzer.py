@@ -3,10 +3,11 @@
 import sqlite3
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
-from core.models import SourceContract
+from core.models import AnySourceContract, DatabaseSourceContract
 from core.sources.database import (
     calculate_load_order,
     detect_foreign_keys,
@@ -165,8 +166,11 @@ def test_generate_database_source_contract_from_table(sqlite_db: str) -> None:
         source_name="users",
     )
 
-    assert isinstance(contract, SourceContract)
+    assert isinstance(contract, AnySourceContract)
     assert contract.source_id == "test_users"
+
+    # Type narrow to DatabaseSourceContract for database-specific fields
+    assert isinstance(contract, DatabaseSourceContract)
     assert contract.database_type == "sqlite"
     assert contract.source_type == "table"
     assert contract.source_name == "users"
@@ -208,8 +212,11 @@ def test_generate_database_source_contract_from_query(sqlite_db: str) -> None:
         query=query,
     )
 
-    assert isinstance(contract, SourceContract)
+    assert isinstance(contract, AnySourceContract)
     assert contract.source_id == "active_users"
+
+    # Type narrow to DatabaseSourceContract for database-specific fields
+    assert isinstance(contract, DatabaseSourceContract)
     assert contract.database_type == "sqlite"
     assert contract.source_type == "query"
 
@@ -579,10 +586,15 @@ def test_generate_database_multi_source_contracts_all_tables(sqlite_db: str) -> 
     )
 
     assert len(contracts) == 2  # users and orders
-    assert all(contract.database_type == "sqlite" for contract in contracts)
+    assert all(
+        isinstance(contract, DatabaseSourceContract) and contract.database_type == "sqlite" for contract in contracts
+    )
 
     # Check that we got both tables
-    table_names = [contract.source_name for contract in contracts]
+    # Type narrow contracts to DatabaseSourceContract for source_name access
+    assert all(isinstance(contract, DatabaseSourceContract) for contract in contracts)
+    db_contracts = cast(list[DatabaseSourceContract], contracts)
+    table_names = [contract.source_name for contract in db_contracts]
     assert "users" in table_names
     assert "orders" in table_names
 
@@ -597,6 +609,8 @@ def test_generate_database_multi_source_contracts_specific_tables(sqlite_db: str
     )
 
     assert len(contracts) == 1
+    # Type narrow to DatabaseSourceContract for source_name access
+    assert isinstance(contracts[0], DatabaseSourceContract)
     assert contracts[0].source_name == "users"
 
 
@@ -609,8 +623,11 @@ def test_generate_database_multi_source_contracts_with_relationships(sqlite_db: 
     )
 
     # Find users and orders contracts
-    users_contract = next((c for c in contracts if c.source_name == "users"), None)
-    orders_contract = next((c for c in contracts if c.source_name == "orders"), None)
+    # Type narrow contracts to DatabaseSourceContract for source_name access
+    assert all(isinstance(c, DatabaseSourceContract) for c in contracts)
+    db_contracts = cast(list[DatabaseSourceContract], contracts)
+    users_contract = next((c for c in db_contracts if c.source_name == "users"), None)
+    orders_contract = next((c for c in db_contracts if c.source_name == "orders"), None)
 
     assert users_contract is not None
     assert orders_contract is not None
@@ -645,7 +662,10 @@ def test_generate_database_multi_source_contracts_load_order(sqlite_db: str) -> 
     )
 
     # Users should come before orders in the list
-    table_names = [c.source_name for c in contracts]
+    # Type narrow contracts to DatabaseSourceContract for source_name access
+    assert all(isinstance(c, DatabaseSourceContract) for c in contracts)
+    db_contracts = cast(list[DatabaseSourceContract], contracts)
+    table_names = [c.source_name for c in db_contracts]
     users_idx = table_names.index("users")
     orders_idx = table_names.index("orders")
 

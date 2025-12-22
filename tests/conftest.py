@@ -5,13 +5,14 @@ from pathlib import Path
 import pytest
 
 from core.models import (
+    AnySourceContract,
+    CSVSourceContract,
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
     FieldDefinition,
     FieldMapping,
     QualityObservation,
-    SourceContract,
     SourceSchema,
     TransformationContract,
     ValidationRules,
@@ -37,12 +38,11 @@ def temp_contract_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def sample_source_contract() -> SourceContract:
-    """Return a sample source contract"""
-    return SourceContract(
+def sample_source_contract() -> AnySourceContract:
+    """Return a sample source contract (CSV type)"""
+    return CSVSourceContract(
         source_id="test_source",
         source_path="/path/to/test.csv",
-        file_format="csv",
         encoding="utf-8",
         delimiter=",",
         has_header=True,
@@ -107,7 +107,7 @@ def sample_transformation_contract() -> TransformationContract:
 
 
 @pytest.fixture
-def saved_source_contract(tmp_path: Path, sample_source_contract: SourceContract) -> Path:
+def saved_source_contract(tmp_path: Path, sample_source_contract: AnySourceContract) -> Path:
     """Save a sample source contract and return its path"""
     contract_path = tmp_path / "source_contract.json"
     with contract_path.open("w") as f:

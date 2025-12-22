@@ -13,6 +13,7 @@ from core.contract_generator import (
     generate_source_analysis,
     generate_source_contract,
 )
+from core.models import CSVSourceContract
 from core.sources.utils import detect_data_types
 
 
@@ -170,7 +171,8 @@ class TestAvanzaRealDataIssues:
         assert contract.data_schema.fields[0].name == "Datum"
         assert "\ufeff" not in contract.data_schema.fields[0].name
 
-        # Test proper delimiter detection
+        # Test proper delimiter detection - type narrow to CSVSourceContract
+        assert isinstance(contract, CSVSourceContract)
         assert contract.delimiter == ";"
 
         # Test data type detection (should scan multiple rows)

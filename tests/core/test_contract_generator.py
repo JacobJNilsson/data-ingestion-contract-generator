@@ -10,6 +10,7 @@ from core.contract_generator import (
     generate_source_contract,
     generate_transformation_contract,
 )
+from core.models import CSVSourceContract
 from core.sources.csv import detect_delimiter
 from core.sources.utils import (
     analyze_numeric_format,
@@ -113,8 +114,10 @@ class TestSourceContractGeneration:
 
         assert contract.contract_type == "source"
         assert contract.source_id == "test_transactions"
-        assert contract.source_path == str(sample_csv_path)
-        assert contract.file_format == "csv"
+        assert contract.source_format == "csv"
+
+        # Type narrow to CSVSourceContract for CSV-specific fields
+        assert isinstance(contract, CSVSourceContract)
         assert contract.encoding == "utf-8"
         assert contract.delimiter == ","
         assert contract.has_header is True
@@ -145,8 +148,11 @@ class TestSourceContractGeneration:
 
         # The sample_transactions.csv file should generate "sample_transactions" as source_id
         assert contract.source_id == "sample_transactions"
-        assert contract.source_path == str(sample_csv_path)
         assert contract.contract_type == "source"
+
+        # Type narrow to CSVSourceContract to access source_path
+        assert isinstance(contract, CSVSourceContract)
+        assert contract.source_path == str(sample_csv_path)
 
     def test_generate_source_contract_auto_generated_id_with_spaces(self, tmp_path: Path) -> None:
         """Test source contract generation with auto-generated source_id for file with spaces"""
