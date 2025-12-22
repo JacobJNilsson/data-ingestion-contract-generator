@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from core.models import AnySourceContract, CSVSourceContract, DestinationContract, TransformationContract
+from core.models import BaseSourceContract, CSVSourceContract, DestinationContract, TransformationContract
 from mcp_server.handlers import ContractHandler, load_contract, save_contract, validate_contract
 
 
 class TestContractFileOperations:
     """Tests for contract file loading and saving"""
 
-    def test_save_and_load_contract(self, tmp_path: Path, sample_source_contract: AnySourceContract) -> None:
+    def test_save_and_load_contract(self, tmp_path: Path, sample_source_contract: CSVSourceContract) -> None:
         """Test saving and loading a contract"""
         contract_path = tmp_path / "test_contract.json"
 
@@ -25,7 +25,7 @@ class TestContractFileOperations:
         loaded = load_contract(str(contract_path))
         assert loaded is not None
         assert loaded.contract_type == "source"
-        assert isinstance(loaded, AnySourceContract)
+        assert isinstance(loaded, BaseSourceContract)
         assert loaded.source_id == "test_source"
 
     def test_load_nonexistent_contract(self) -> None:
@@ -41,7 +41,7 @@ class TestContractFileOperations:
         result = load_contract(str(contract_path))
         assert result is None
 
-    def test_save_contract_creates_directories(self, tmp_path: Path, sample_source_contract: AnySourceContract) -> None:
+    def test_save_contract_creates_directories(self, tmp_path: Path, sample_source_contract: CSVSourceContract) -> None:
         """Test that save_contract creates parent directories"""
         contract_path = tmp_path / "nested" / "dir" / "contract.json"
 
@@ -53,7 +53,7 @@ class TestContractFileOperations:
 class TestContractValidation:
     """Tests for contract validation"""
 
-    def test_validate_source_contract_valid(self, sample_source_contract: AnySourceContract) -> None:
+    def test_validate_source_contract_valid(self, sample_source_contract: CSVSourceContract) -> None:
         """Test validation of a valid source contract"""
         issues = validate_contract(sample_source_contract)
         assert issues == []

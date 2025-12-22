@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from core.models import (
-    AnySourceContract,
     CSVSourceContract,
     DestinationContract,
     DestinationSchema,
@@ -38,7 +37,7 @@ def temp_contract_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def sample_source_contract() -> AnySourceContract:
+def sample_source_contract() -> CSVSourceContract:
     """Return a sample source contract (CSV type)"""
     return CSVSourceContract(
         source_id="test_source",
@@ -107,7 +106,7 @@ def sample_transformation_contract() -> TransformationContract:
 
 
 @pytest.fixture
-def saved_source_contract(tmp_path: Path, sample_source_contract: AnySourceContract) -> Path:
+def saved_source_contract(tmp_path: Path, sample_source_contract: CSVSourceContract) -> Path:
     """Save a sample source contract and return its path"""
     contract_path = tmp_path / "source_contract.json"
     with contract_path.open("w") as f:
