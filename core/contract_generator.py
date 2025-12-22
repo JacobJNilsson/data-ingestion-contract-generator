@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from core.models import (
-    AnySourceContract,
     CSVSourceContract,
     DestinationContract,
     DestinationSchema,
@@ -50,7 +49,7 @@ def generate_source_analysis(source_path: str, sample_size: int = 1000) -> Sourc
 
 def generate_source_contract(
     source_path: str, source_id: str | None = None, config: dict[str, Any] | None = None
-) -> AnySourceContract:
+) -> CSVSourceContract | JSONSourceContract:
     """Generate a source contract describing a data source
 
     Args:
@@ -60,7 +59,7 @@ def generate_source_contract(
         config: Optional configuration dictionary (can include 'sample_size')
 
     Returns:
-        Source contract model
+        CSVSourceContract or JSONSourceContract based on file type
     """
     # Extract sample_size from config, default to 1000
     sample_size = config.get("sample_size", 1000) if config else 1000
