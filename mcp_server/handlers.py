@@ -11,7 +11,13 @@ from core.contract_generator import (
     generate_source_contract,
     generate_transformation_contract,
 )
-from core.models import Contract, DestinationContract, SourceContract, TransformationContract
+from core.models import (
+    AnySourceContract,
+    Contract,
+    DestinationContract,
+    TransformationContract,
+    validate_source_contract,
+)
 from core.sources.database import (
     generate_database_multi_source_contracts,
     generate_database_source_contract,
@@ -38,7 +44,7 @@ def load_contract(contract_path: str) -> Contract | None:
             # Determine contract type and parse accordingly
             contract_type = data.get("contract_type")
             if contract_type == "source":
-                return SourceContract.model_validate(data)
+                return validate_source_contract(data)
             elif contract_type == "destination":
                 return DestinationContract.model_validate(data)
             elif contract_type == "transformation":
@@ -360,7 +366,7 @@ class ContractHandler:
         }
 
         # Add type-specific fields
-        if isinstance(contract, SourceContract):
+        if isinstance(contract, AnySourceContract):
             result["source_id"] = contract.source_id
         elif isinstance(contract, DestinationContract):
             result["destination_id"] = contract.destination_id
