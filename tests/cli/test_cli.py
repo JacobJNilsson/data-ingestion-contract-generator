@@ -6,7 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from cli.main import app
-from core.models import DestinationContract, SourceContract
+from core.models import DestinationContract, validate_source_contract
 
 runner = CliRunner()
 
@@ -52,9 +52,9 @@ def test_source_csv_to_file(sample_csv_path: Path, tmp_path: Path) -> None:
 
     # Validate the generated contract
     contract_data = json.loads(output_file.read_text())
-    contract = SourceContract.model_validate(contract_data)
+    contract = validate_source_contract(contract_data)
     assert contract.source_id == "test_source"
-    assert contract.file_format == "csv"
+    assert contract.source_format == "csv"
 
 
 def test_source_csv_pretty_output(sample_csv_path: Path, tmp_path: Path) -> None:

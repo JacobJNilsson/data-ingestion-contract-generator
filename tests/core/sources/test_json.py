@@ -94,7 +94,7 @@ def test_cli_source_json() -> None:
 
         contract = json.loads(output_path.read_text())
         assert contract["source_id"] == "users"
-        assert contract["file_format"] == "json"
+        assert contract["source_format"] == "json"
 
         # Check field names in new FieldDefinition format
         field_names = [f["name"] for f in contract["schema"]["fields"]]
