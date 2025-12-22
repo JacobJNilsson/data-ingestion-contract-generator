@@ -44,7 +44,7 @@ def test_load_config_missing_file() -> None:
             assert isinstance(config, Config)
             assert config.version == "1.0"
             assert config.connections == {}
-            assert config.defaults.csv.delimiter == ","
+            assert config.defaults.csv.sample_size == 1000
 
 
 def test_save_and_load_config() -> None:
@@ -142,11 +142,9 @@ def test_resolve_connection_without_reference() -> None:
 
 def test_get_csv_defaults() -> None:
     """Test getting CSV defaults from config."""
-    config = Config(defaults=Defaults(csv=CSVDefaults(delimiter="|", encoding="latin-1", sample_size=500)))
+    config = Config(defaults=Defaults(csv=CSVDefaults(sample_size=500)))
 
     csv_defaults = get_csv_defaults(config)
-    assert csv_defaults.delimiter == "|"
-    assert csv_defaults.encoding == "latin-1"
     assert csv_defaults.sample_size == 500
 
 
@@ -160,10 +158,11 @@ def test_get_output_defaults() -> None:
 
 
 def test_get_csv_defaults_uses_config_defaults() -> None:
-    """Test getting CSV defaults without explicit config."""
+    """Test getting CSV defaults without explicit config.
+
+    Note: delimiter and encoding are auto-detected, not in config defaults.
+    """
     csv_defaults = get_csv_defaults()
-    assert csv_defaults.delimiter == ","
-    assert csv_defaults.encoding == "utf-8"
     assert csv_defaults.sample_size == 1000
 
 

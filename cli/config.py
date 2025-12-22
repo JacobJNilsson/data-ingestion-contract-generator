@@ -13,11 +13,9 @@ class CSVDefaults(BaseModel):
     """Default values for CSV operations.
 
     Note: delimiter and encoding are auto-detected from files.
-    These defaults are only used if explicitly provided via CLI to override auto-detection.
+    Use CLI flags (--delimiter, --encoding) to override auto-detection if needed.
     """
 
-    delimiter: str | None = None  # Auto-detected by default
-    encoding: str | None = None  # Auto-detected by default
     sample_size: int = 1000
 
 
@@ -25,10 +23,9 @@ class JSONDefaults(BaseModel):
     """Default values for JSON operations.
 
     Note: encoding is auto-detected from files.
-    This default is only used if explicitly provided via CLI to override auto-detection.
+    Use CLI flag (--encoding) to override auto-detection if needed.
     """
 
-    encoding: str | None = None  # Auto-detected by default
     sample_size: int = 1000
 
 
