@@ -10,8 +10,8 @@ These tests ensure proper handling of:
 from pathlib import Path
 
 from core.contract_generator import (
+    generate_csv_source_contract,
     generate_source_analysis,
-    generate_source_contract,
 )
 from core.models import CSVSourceContract
 from core.sources.utils import detect_data_types
@@ -38,7 +38,7 @@ class TestBOMHandling:
         csv_file = tmp_path / "bom_contract.csv"
         csv_file.write_text(csv_content, encoding="utf-8")
 
-        contract = generate_source_contract(str(csv_file), "test_bom")
+        contract = generate_csv_source_contract(str(csv_file), "test_bom")
 
         # Check that BOM is not in the schema fields
         assert contract.data_schema.fields[0].name == "Datum"
@@ -165,7 +165,7 @@ class TestAvanzaRealDataIssues:
         csv_file = tmp_path / "avanza.csv"
         csv_file.write_text(csv_content, encoding="utf-8")
 
-        contract = generate_source_contract(str(csv_file), "avanza_transactions")
+        contract = generate_csv_source_contract(str(csv_file), "avanza_transactions")
 
         # Test BOM is stripped
         assert contract.data_schema.fields[0].name == "Datum"

@@ -38,20 +38,28 @@ To use these tools with Cursor, add to `.cursor/mcp.json`:
 
 ### Contract Generation
 
-1. **generate_source_contract** - Generate a source contract from a data file
-   - Automatically analyzes file format, encoding, schema, and quality
-   - Returns: JSON contract with `contract_type: "source"`
+1. **generate_csv_source_contract** - Generate a source contract from a CSV file
+   - Analyzes CSV format, encoding, delimiter, schema, and quality
+   - Returns: CSVSourceContract
 
-2. **generate_database_source_contract** - Generate a source contract from a database table or query
+2. **generate_json_source_contract** - Generate a source contract from a JSON/NDJSON file
+   - Analyzes JSON format, encoding, schema, and quality
+   - Returns: JSONSourceContract
+
+3. **generate_source_analysis** - Analyze a file to determine its type and extract metadata
+   - Content-based file type detection
+   - Returns: SourceAnalysisResult with file_type, schema, and quality metrics
+
+4. **generate_database_source_contract** - Generate a source contract from a database table or query
    - Supports PostgreSQL, MySQL, and SQLite
    - Analyzes schema, types, and samples data
    - Returns: JSON contract with `contract_type: "source"`
 
-3. **generate_destination_contract** - Generate a destination contract
+5. **generate_destination_contract** - Generate a destination contract
    - Define target schema, validation rules, and constraints
    - Returns: JSON contract with `contract_type: "destination"`
 
-4. **generate_transformation_contract** - Generate a transformation contract
+6. **generate_transformation_contract** - Generate a transformation contract
    - Maps source to destination with transformation rules
    - Returns: JSON contract with `contract_type: "transformation"`
 
@@ -124,10 +132,16 @@ contract = generate_database_source_contract(
 
 ```python
 # 1. Generate source contract from CSV file
-source_contract = generate_source_contract(
+source_contract = generate_csv_source_contract(
     source_path="/path/to/data.csv",
     source_id="swedish_bank_csv"
 )
+
+# Or for JSON files:
+# source_contract = generate_json_source_contract(
+#     source_path="/path/to/data.json",
+#     source_id="swedish_bank_json"
+# )
 
 # 2. Generate destination contract
 dest_contract = generate_destination_contract(

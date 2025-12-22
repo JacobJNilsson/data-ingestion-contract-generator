@@ -6,15 +6,18 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from core.contract_generator import (
+    generate_csv_source_contract,
     generate_destination_contract,
+    generate_json_source_contract,
     generate_source_analysis,
-    generate_source_contract,
     generate_transformation_contract,
 )
 from core.models import (
     BaseSourceContract,
     Contract,
+    CSVSourceContract,
     DestinationContract,
+    JSONSourceContract,
     TransformationContract,
     validate_source_contract,
 )
@@ -117,7 +120,43 @@ class ContractHandler:
             return json.dumps({"error": "Source file not found", "path": source_path}, indent=2)
 
         try:
-            contract = generate_source_contract(str(source_full_path), source_id, config)
+            # Extract parameters from config with proper type casting
+            sample_size = 1000
+            delimiter: str | None = None
+            encoding: str | None = None
+
+            if config:
+                if "sample_size" in config and isinstance(config["sample_size"], int):
+                    sample_size = config["sample_size"]
+                if "delimiter" in config and isinstance(config["delimiter"], str):
+                    delimiter = config["delimiter"]
+                if "encoding" in config and isinstance(config["encoding"], str):
+                    encoding = config["encoding"]
+
+            # Analyze file to determine type (content-based detection)
+            source_analysis = generate_source_analysis(str(source_full_path), sample_size=sample_size)
+
+            # Delegate to specific function based on detected type
+            contract: CSVSourceContract | JSONSourceContract
+            if source_analysis.file_type in ("json", "ndjson"):
+                contract = generate_json_source_contract(
+                    source_path=str(source_full_path),
+                    source_id=source_id,
+                    encoding=encoding,
+                    sample_size=sample_size,
+                    config=config,
+                )
+            else:
+                # Default to CSV
+                contract = generate_csv_source_contract(
+                    source_path=str(source_full_path),
+                    source_id=source_id,
+                    delimiter=delimiter,
+                    encoding=encoding,
+                    sample_size=sample_size,
+                    config=config,
+                )
+
             return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
         except (ValueError, OSError, ValidationError) as e:
             return json.dumps({"error": f"Failed to generate source contract: {e!s}"}, indent=2)
@@ -215,7 +254,8 @@ class ContractHandler:
 
             # Note: We don't include the connection string in the contract for security
             # It should be managed externally
-            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
+            result: str = contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
+            return result
 
         except ValueError as e:
             return json.dumps({"error": f"Validation error: {e!s}"}, indent=2)

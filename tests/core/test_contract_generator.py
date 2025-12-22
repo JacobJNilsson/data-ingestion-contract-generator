@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 from core.contract_generator import (
+    generate_csv_source_contract,
     generate_destination_contract,
     generate_source_analysis,
-    generate_source_contract,
     generate_transformation_contract,
 )
 from core.models import CSVSourceContract
@@ -108,7 +108,7 @@ class TestSourceContractGeneration:
 
     def test_generate_source_contract(self, sample_csv_path: Path) -> None:
         """Test source contract generation from CSV file"""
-        contract = generate_source_contract(
+        contract = generate_csv_source_contract(
             source_path=str(sample_csv_path), source_id="test_transactions", config={"note": "test"}
         )
 
@@ -138,13 +138,13 @@ class TestSourceContractGeneration:
 
     def test_generate_source_contract_no_config(self, sample_csv_path: Path) -> None:
         """Test source contract generation without config"""
-        contract = generate_source_contract(source_path=str(sample_csv_path), source_id="test_source")
+        contract = generate_csv_source_contract(source_path=str(sample_csv_path), source_id="test_source")
 
         assert contract.metadata == {}
 
     def test_generate_source_contract_auto_generated_id(self, sample_csv_path: Path) -> None:
         """Test source contract generation with auto-generated source_id"""
-        contract = generate_source_contract(source_path=str(sample_csv_path))
+        contract = generate_csv_source_contract(source_path=str(sample_csv_path))
 
         # The sample_transactions.csv file should generate "sample_transactions" as source_id
         assert contract.source_id == "sample_transactions"
@@ -160,7 +160,7 @@ class TestSourceContractGeneration:
         test_file = tmp_path / "my test file.csv"
         test_file.write_text("col1,col2\nval1,val2\n")
 
-        contract = generate_source_contract(source_path=str(test_file))
+        contract = generate_csv_source_contract(source_path=str(test_file))
 
         # Spaces should be converted to underscores
         assert contract.source_id == "my_test_file"
@@ -171,7 +171,7 @@ class TestSourceContractGeneration:
         test_file = tmp_path / "my-test-file.csv"
         test_file.write_text("col1,col2\nval1,val2\n")
 
-        contract = generate_source_contract(source_path=str(test_file))
+        contract = generate_csv_source_contract(source_path=str(test_file))
 
         # Hyphens should be converted to underscores
         assert contract.source_id == "my_test_file"
