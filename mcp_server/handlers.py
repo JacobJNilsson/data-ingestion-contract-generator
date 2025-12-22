@@ -12,7 +12,7 @@ from core.contract_generator import (
     generate_transformation_contract,
 )
 from core.models import (
-    AnySourceContract,
+    BaseSourceContract,
     Contract,
     DestinationContract,
     TransformationContract,
@@ -366,7 +366,7 @@ class ContractHandler:
         }
 
         # Add type-specific fields
-        if isinstance(contract, AnySourceContract):
+        if isinstance(contract, BaseSourceContract):
             result["source_id"] = contract.source_id
         elif isinstance(contract, DestinationContract):
             result["destination_id"] = contract.destination_id
