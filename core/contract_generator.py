@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from core.models import (
+    CSVSourceContract,
     DestinationContract,
     DestinationSchema,
     ExecutionPlan,
     FieldDefinition,
+    JSONSourceContract,
     QualityObservation,
     SourceAnalysisResult,
-    SourceContract,
     SourceSchema,
     TransformationContract,
 )
@@ -48,7 +49,7 @@ def generate_source_analysis(source_path: str, sample_size: int = 1000) -> Sourc
 
 def generate_source_contract(
     source_path: str, source_id: str | None = None, config: dict[str, Any] | None = None
-) -> SourceContract:
+) -> CSVSourceContract | JSONSourceContract:
     """Generate a source contract describing a data source
 
     Args:
@@ -58,7 +59,7 @@ def generate_source_contract(
         config: Optional configuration dictionary (can include 'sample_size')
 
     Returns:
-        Source contract model
+        CSVSourceContract or JSONSourceContract based on file type
     """
     # Extract sample_size from config, default to 1000
     sample_size = config.get("sample_size", 1000) if config else 1000
@@ -77,22 +78,42 @@ def generate_source_contract(
         profile = source_analysis.field_profiles.get(name)
         fields.append(FieldDefinition(name=name, data_type=dtype, profiling=profile))
 
-    return SourceContract(
-        source_id=source_id,
-        source_path=str(source_path),
-        file_format=source_analysis.file_type,
-        encoding=source_analysis.encoding,
-        delimiter=source_analysis.delimiter,
-        has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
-        schema=SourceSchema(fields=fields),
-        quality=QualityObservation(
-            total_rows=source_analysis.total_rows,
-            observed_profiling=source_analysis.field_profiles,
-            sample_data=source_analysis.sample_data,
-            issues=source_analysis.issues,
-        ),
-        metadata=config or {},
+    # Create the appropriate contract subtype based on file type
+    schema = SourceSchema(fields=fields)
+    quality = QualityObservation(
+        total_rows=source_analysis.total_rows,
+        observed_profiling=source_analysis.field_profiles,
+        sample_data=source_analysis.sample_data,
+        issues=source_analysis.issues,
     )
+    metadata = config or {}
+
+    if source_analysis.file_type == "csv":
+        return CSVSourceContract(
+            source_id=source_id,
+            source_path=str(source_path),
+            encoding=source_analysis.encoding,
+            delimiter=source_analysis.delimiter or ",",
+            has_header=source_analysis.has_header if source_analysis.has_header is not None else True,
+            schema=schema,
+            quality=quality,
+            metadata=metadata,
+        )
+    elif source_analysis.file_type == "json":
+        # Determine if NDJSON based on file extension
+        is_ndjson = Path(source_path).suffix.lower() in [".jsonl", ".ndjson"]
+        return JSONSourceContract(
+            source_id=source_id,
+            source_path=str(source_path),
+            encoding=source_analysis.encoding,
+            is_ndjson=is_ndjson,
+            schema=schema,
+            quality=quality,
+            metadata=metadata,
+        )
+    else:
+        msg = f"Unsupported file type: {source_analysis.file_type}"
+        raise ValueError(msg)
 
 
 def generate_destination_contract(
