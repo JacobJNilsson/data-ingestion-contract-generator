@@ -6,7 +6,7 @@ import typer
 from pydantic import ValidationError
 
 from cli.output import error_message, handle_permission_error, success_message
-from core.models import DestinationContract, SourceContract, TransformationContract
+from core.models import DestinationContract, TransformationContract, validate_source_contract
 
 
 def validate_contract_file(contract_path: Path) -> bool:
@@ -30,7 +30,7 @@ def validate_contract_file(contract_path: Path) -> bool:
 
         match contract_type:
             case "source":
-                SourceContract.model_validate_json(contract_json)
+                validate_source_contract(contract_json)
             case "destination":
                 DestinationContract.model_validate_json(contract_json)
             case "transformation":
