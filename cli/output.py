@@ -1,6 +1,6 @@
-"""Output formatting utilities for CLI."""
-
+import errno
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +10,27 @@ from rich.console import Console
 from rich.syntax import Syntax
 
 console = Console()
+
+
+def handle_permission_error(path: Path, error: PermissionError) -> None:
+    """Handle permission errors with platform-specific hints.
+
+    Args:
+        path: Path that caused the error
+        error: The PermissionError exception
+    """
+    hint = "Check file permissions."
+
+    # On macOS, EPERM (errno 1) usually indicates a TCC/Full Disk Access restriction
+    # for protected folders like Downloads, Documents, etc.
+    # We use getattr to safely access errno in case it's missing.
+    if sys.platform == "darwin" and getattr(error, "errno", None) == errno.EPERM:
+        hint = (
+            "This looks like a macOS security restriction. Try moving the file "
+            "to your project folder or grant the terminal 'Full Disk Access' in System Settings."
+        )
+
+    error_message(f"Permission denied: {path}", hint=hint)
 
 
 def format_json(data: dict[str, Any], pretty: bool = False) -> str:
@@ -69,9 +90,13 @@ def output_contract(
 
     # Write to file or stdout
     if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(output_str, encoding="utf-8")
-        typer.secho(f"✓ Contract written to {output_path}", fg=typer.colors.GREEN)
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(output_str, encoding="utf-8")
+            typer.secho(f"✓ Contract written to {output_path}", fg=typer.colors.GREEN)
+        except PermissionError as e:
+            handle_permission_error(output_path, e)
+            raise typer.Exit(1) from e
     else:
         # Pretty print to terminal with syntax highlighting
         match output_format:

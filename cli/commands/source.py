@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from cli.output import error_message, output_contract
+from cli.output import error_message, handle_permission_error, output_contract
 from core.contract_generator import generate_source_contract
 from core.models import TableInfo
 from core.sources.database.relationships import list_database_tables
@@ -16,7 +16,7 @@ app.add_typer(database_app, name="database")
 
 @app.command("csv")
 def source_csv(
-    path: Path = typer.Argument(..., help="Path to CSV file", exists=True, dir_okay=False, resolve_path=True),
+    path: Path = typer.Argument(..., help="Path to CSV file", dir_okay=False, resolve_path=True, readable=False),
     source_id: str | None = typer.Option(
         None, "--id", help="Unique identifier for this source (default: derived from file name)"
     ),
@@ -36,6 +36,11 @@ def source_csv(
         contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json --pretty
     """
     try:
+        # Check if file exists manually to handle macOS permission issues
+        if not path.exists():
+            error_message(f"File not found: {path}", hint="Check the file path and try again")
+            raise typer.Exit(1)
+
         # Load config for defaults
         from cli.config import get_csv_defaults, get_output_defaults
 
@@ -68,11 +73,16 @@ def source_csv(
         contract_json = contract.model_dump_json(by_alias=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
+        # This catch is mainly for errors that might occur during processing
+        # path.exists() check above handles the initial case
         error_message(f"File not found: {path}", hint="Check the file path and try again")
-        raise typer.Exit(1) from e
+        raise typer.Exit(1) from None
     except ValueError as e:
         error_message(str(e), hint="Check the file format and parameters")
+        raise typer.Exit(1) from e
+    except PermissionError as e:
+        handle_permission_error(path, e)
         raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to generate source contract: {e}")
@@ -81,7 +91,9 @@ def source_csv(
 
 @app.command("json")
 def source_json(
-    path: Path = typer.Argument(..., help="Path to JSON/NDJSON file", exists=True, dir_okay=False, resolve_path=True),
+    path: Path = typer.Argument(
+        ..., help="Path to JSON/NDJSON file", dir_okay=False, resolve_path=True, readable=False
+    ),
     source_id: str | None = typer.Option(
         None, "--id", help="Unique identifier for this source (default: derived from file name)"
     ),
@@ -100,6 +112,11 @@ def source_json(
         contract-gen source json data/users.json --id users --output contracts/source.json
     """
     try:
+        # Check if file exists manually to handle macOS permission issues
+        if not path.exists():
+            error_message(f"File not found: {path}", hint="Check the file path and try again")
+            raise typer.Exit(1)
+
         # Load config for defaults
         from cli.config import get_json_defaults, get_output_defaults
 
@@ -128,11 +145,16 @@ def source_json(
         contract_json = contract.model_dump_json(by_alias=True)
         output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
+        # This catch is mainly for errors that might occur during processing
+        # path.exists() check above handles the initial case
         error_message(f"File not found: {path}", hint="Check the file path and try again")
-        raise typer.Exit(1) from e
+        raise typer.Exit(1) from None
     except ValueError as e:
         error_message(str(e), hint="Check the file format and parameters")
+        raise typer.Exit(1) from e
+    except PermissionError as e:
+        handle_permission_error(path, e)
         raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to generate source contract: {e}")
