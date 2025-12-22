@@ -10,17 +10,25 @@ DEFAULT_CONFIG_PATH = Path.home() / ".contract-gen.yaml"
 
 
 class CSVDefaults(BaseModel):
-    """Default values for CSV operations."""
+    """Default values for CSV operations.
 
-    delimiter: str = ","
-    encoding: str = "utf-8"
+    Note: delimiter and encoding are auto-detected from files.
+    These defaults are only used if explicitly provided via CLI to override auto-detection.
+    """
+
+    delimiter: str | None = None  # Auto-detected by default
+    encoding: str | None = None  # Auto-detected by default
     sample_size: int = 1000
 
 
 class JSONDefaults(BaseModel):
-    """Default values for JSON operations."""
+    """Default values for JSON operations.
 
-    encoding: str = "utf-8"
+    Note: encoding is auto-detected from files.
+    This default is only used if explicitly provided via CLI to override auto-detection.
+    """
+
+    encoding: str | None = None  # Auto-detected by default
     sample_size: int = 1000
 
 
