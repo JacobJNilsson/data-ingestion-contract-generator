@@ -47,11 +47,8 @@ def source_csv(
         csv_defaults = get_csv_defaults()
         output_defaults = get_output_defaults()
 
-        # Apply defaults from config if not specified via CLI
-        if delimiter is None:
-            delimiter = csv_defaults.delimiter
-        if encoding is None:
-            encoding = csv_defaults.encoding
+        # Apply defaults from config for sample_size and output settings
+        # Note: delimiter and encoding are auto-detected, so we don't apply config defaults for them
         if sample_size is None:
             sample_size = csv_defaults.sample_size
         if output_format is None:
@@ -59,11 +56,15 @@ def source_csv(
         if pretty is None:
             pretty = output_defaults.pretty
 
-        # Build config
+        # Build config dict with sample_size for analysis
+        # delimiter and encoding will be auto-detected by the analyzer
         config_dict: dict[str, str | int] = {"sample_size": sample_size}
-        if delimiter:
+
+        # If user explicitly provided delimiter or encoding, add them to config as overrides
+        # These will be used by the analyzer instead of auto-detection
+        if delimiter is not None:
             config_dict["delimiter"] = delimiter
-        if encoding:
+        if encoding is not None:
             config_dict["encoding"] = encoding
 
         # Generate contract
@@ -123,9 +124,8 @@ def source_json(
         json_defaults = get_json_defaults()
         output_defaults = get_output_defaults()
 
-        # Apply defaults from config if not specified via CLI
-        if encoding is None:
-            encoding = json_defaults.encoding
+        # Apply defaults from config for sample_size and output settings
+        # Note: encoding is auto-detected, so we don't apply config defaults for it
         if sample_size is None:
             sample_size = json_defaults.sample_size
         if output_format is None:
@@ -133,9 +133,13 @@ def source_json(
         if pretty is None:
             pretty = output_defaults.pretty
 
-        # Build config
+        # Build config dict with sample_size for analysis
+        # encoding will be auto-detected by the analyzer
         config_dict: dict[str, str | int] = {"sample_size": sample_size}
-        if encoding:
+
+        # If user explicitly provided encoding, add it to config as an override
+        # This will be used by the analyzer instead of auto-detection
+        if encoding is not None:
             config_dict["encoding"] = encoding
 
         # Generate contract
