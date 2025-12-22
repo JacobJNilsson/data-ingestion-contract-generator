@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 from pydantic import ValidationError
 
-from cli.output import error_message, success_message
+from cli.output import error_message, handle_permission_error, success_message
 from core.models import DestinationContract, SourceContract, TransformationContract
 
 
@@ -63,8 +63,8 @@ def validate(
     path: Path = typer.Argument(
         ...,
         help="Path to contract file or directory",
-        exists=True,
         resolve_path=True,
+        readable=False,
     ),
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Recursively validate all contracts in directory"),
 ) -> None:
@@ -78,6 +78,11 @@ def validate(
         contract-gen validate contracts/ --recursive
     """
     try:
+        # Check if file exists manually to handle macOS permission issues
+        if not path.exists():
+            error_message(f"File not found: {path}", hint="Check the file path and try again")
+            raise typer.Exit(1)
+
         if path.is_file():
             # Validate single file
             if not validate_contract_file(path):
@@ -116,6 +121,9 @@ def validate(
 
     except typer.Exit:
         raise
+    except PermissionError as e:
+        handle_permission_error(path, e)
+        raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Validation failed: {e}")
         raise typer.Exit(1) from e

@@ -95,7 +95,7 @@ def test_source_csv_with_delimiter(sample_csv_path: Path, tmp_path: Path) -> Non
 def test_source_csv_nonexistent_file() -> None:
     """Test error handling for nonexistent file."""
     result = runner.invoke(app, ["source", "csv", "/nonexistent/file.csv", "--id", "test_source"])
-    assert result.exit_code == 2  # Typer returns 2 for parameter errors
+    assert result.exit_code == 1  # Manual existence check returns 1
 
 
 def test_destination_csv_help() -> None:

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import typer
 
-from cli.output import error_message, output_contract
+from cli.output import error_message, handle_permission_error, output_contract
 from core.contract_generator import generate_destination_contract
 
 app = typer.Typer(help="Generate destination contracts")
@@ -102,7 +102,7 @@ app.add_typer(api_app, name="api")
 
 @api_app.command("generate")
 def generate_api_contract(
-    schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
+    schema_file: Path = typer.Argument(..., help="OpenAPI/Swagger schema file (JSON or YAML)", readable=False),
     endpoint: str = typer.Argument(..., help="API endpoint path (e.g. /users, /data)"),
     destination_id: str = typer.Option(..., "--id", help="Unique identifier for this destination"),
     method: str = typer.Option("POST", "--method", help="HTTP method (GET, POST, PUT, PATCH, DELETE)"),
@@ -118,6 +118,11 @@ def generate_api_contract(
         contract-gen destination api generate openapi.json /users --id users_api --method POST --pretty
     """
     try:
+        # Check if file exists manually to handle macOS permission issues
+        if not schema_file.exists():
+            error_message(f"File not found: {schema_file}", hint="Check the file path and try again")
+            raise typer.Exit(1)
+
         # Load config for defaults
         from cli.config import get_output_defaults
 
@@ -143,6 +148,9 @@ def generate_api_contract(
 
     except ValueError as e:
         error_message(str(e), hint="Check your OpenAPI schema file and endpoint path")
+        raise typer.Exit(1) from e
+    except PermissionError as e:
+        handle_permission_error(schema_file, e)
         raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to generate destination contract: {e}")
@@ -188,7 +196,7 @@ def _format_endpoint_text(ep: dict, with_fields: bool) -> list[str]:
 
 @api_app.command("list")
 def list_api_endpoints(
-    schema_file: Path = typer.Argument(..., exists=True, help="OpenAPI/Swagger schema file (JSON or YAML)"),
+    schema_file: Path = typer.Argument(..., help="OpenAPI/Swagger schema file (JSON or YAML)", readable=False),
     with_fields: bool = typer.Option(False, "--with-fields", help="Include request body field details"),
     method: str | None = typer.Option(None, "--method", help="Filter by HTTP method"),
     output_format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
@@ -199,6 +207,11 @@ def list_api_endpoints(
         contract-gen destination api list openapi.yaml --method POST
     """
     try:
+        # Check if file exists manually to handle macOS permission issues
+        if not schema_file.exists():
+            error_message(f"File not found: {schema_file}", hint="Check the file path and try again")
+            raise typer.Exit(1)
+
         import json
 
         from core.sources.api.introspection import extract_endpoint_list
@@ -225,6 +238,9 @@ def list_api_endpoints(
             for line in _format_endpoint_text(ep, with_fields):
                 typer.echo(line)
 
+    except PermissionError as e:
+        handle_permission_error(schema_file, e)
+        raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to list endpoints: {e}")
         raise typer.Exit(1) from e
