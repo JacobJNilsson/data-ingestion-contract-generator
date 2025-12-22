@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy.exc import DatabaseError, NoSuchTableError, OperationalError
 
-from core.models import QueryMetadata, RelationshipInfo, SourceContract, TableMetadata
+from core.models import AnySourceContract, DatabaseSourceContract, QueryMetadata, RelationshipInfo, TableMetadata
 from core.sources.database.introspection import analyze_database_query, analyze_database_table
 from core.sources.database.relationships import calculate_load_order, detect_foreign_keys, list_database_tables
 
@@ -22,7 +22,7 @@ def generate_database_source_contract(
     schema: str | None = None,
     sample_size: int = 1000,
     config: dict[str, Any] | None = None,
-) -> SourceContract:
+) -> AnySourceContract:
     """Generate a source contract from a database table or query.
 
     Args:
@@ -37,7 +37,7 @@ def generate_database_source_contract(
         config: Additional configuration options
 
     Returns:
-        SourceContract instance
+        AnySourceContract instance
 
     Raises:
         ValueError: If required parameters are missing or invalid
@@ -78,13 +78,18 @@ def generate_database_source_contract(
     if config:
         metadata_dict.update(config)
 
-    # Create source contract
-    # Using schema parameter (alias) instead of data_schema to satisfy Pydantic
-    contract = SourceContract(
+    # Validate and cast parameters to Literal types
+    if database_type not in ("postgresql", "mysql", "sqlite"):
+        raise ValueError(f"Invalid database_type: {database_type}")
+    if source_type not in ("table", "view", "query"):
+        raise ValueError(f"Invalid source_type: {source_type}")
+
+    # Create source contract using the database-specific subtype
+    contract = DatabaseSourceContract(
         source_id=source_id,
-        database_type=database_type,
-        source_type=source_type,
-        source_name=source_name,
+        database_type=database_type,  # type: ignore[arg-type]
+        source_type=source_type,  # type: ignore[arg-type]
+        source_name=source_name or query or "",
         database_schema=schema,
         schema=source_schema,
         quality=quality_observation,
@@ -102,7 +107,7 @@ def generate_database_multi_source_contracts(
     include_relationships: bool = True,
     sample_size: int = 1000,
     config: dict[str, Any] | None = None,
-) -> list[SourceContract]:
+) -> list[AnySourceContract]:
     """Generate source contracts for multiple tables with relationship metadata.
 
     Args:
@@ -115,7 +120,7 @@ def generate_database_multi_source_contracts(
         config: Optional configuration dictionary
 
     Returns:
-        List of SourceContract instances with relationship metadata
+        List of AnySourceContract instances with relationship metadata
 
     Raises:
         ValueError: If database_type is not supported or tables not found
