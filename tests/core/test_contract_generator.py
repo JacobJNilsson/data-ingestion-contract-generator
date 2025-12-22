@@ -111,7 +111,6 @@ class TestSourceContractGeneration:
             source_path=str(sample_csv_path), source_id="test_transactions", config={"note": "test"}
         )
 
-        assert contract.contract_version == "2.0"
         assert contract.contract_type == "source"
         assert contract.source_id == "test_transactions"
         assert contract.source_path == str(sample_csv_path)
@@ -187,7 +186,6 @@ class TestDestinationContractGeneration:
             destination_id="test_dest", schema=schema, config={"database": "postgres"}
         )
 
-        assert contract.contract_version == "2.0"
         assert contract.contract_type == "destination"
         assert contract.destination_id == "test_dest"
         assert len(contract.data_schema.fields) == 3
@@ -217,7 +215,6 @@ class TestTransformationContractGeneration:
             config={"batch_size": 500, "error_threshold": 0.05},
         )
 
-        assert contract.contract_version == "2.0"
         assert contract.contract_type == "transformation"
         assert contract.transformation_id == "test_transform"
         assert contract.source_ref == "source_1"

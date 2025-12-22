@@ -65,7 +65,6 @@ def test_destination_api_cli_with_openapi_schema(tmp_path: Path) -> None:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
-    assert contract["contract_version"] == "2.0"
     assert contract["destination_id"] == "users_api"
 
     fields = contract["schema"]["fields"]
@@ -148,7 +147,6 @@ paths:
     assert output_file.exists()
 
     contract = json.loads(output_file.read_text())
-    assert contract["contract_version"] == "2.0"
 
     field_names = [f["name"] for f in contract["schema"]["fields"]]
     assert "id" in field_names

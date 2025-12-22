@@ -229,7 +229,6 @@ class QualityMetrics(BaseModel):
 class SourceContract(BaseModel):
     """Contract describing a data source"""
 
-    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["source"] = Field(default="source", description="Type of contract")
     source_id: str = Field(description="Unique identifier for this source (auto-generated if not provided)")
     # File-based sources
@@ -285,7 +284,6 @@ class ValidationRules(BaseModel):
 class DestinationContract(BaseModel):
     """Contract describing a data destination"""
 
-    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["destination"] = Field(default="destination", description="Type of contract")
     destination_id: str = Field(description="Unique identifier for this destination")
     data_schema: DestinationSchema = Field(description="Schema definition", alias="schema")
@@ -323,7 +321,6 @@ class ExecutionPlan(BaseModel):
 class TransformationContract(BaseModel):
     """Contract describing a data transformation from source to destination"""
 
-    contract_version: str = Field(default="2.0", description="Version of the contract schema")
     contract_type: Literal["transformation"] = Field(default="transformation", description="Type of contract")
     transformation_id: str = Field(description="Unique identifier for this transformation")
     source_ref: str = Field(description="Reference to source contract ID")
