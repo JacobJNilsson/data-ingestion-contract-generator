@@ -67,6 +67,7 @@ def test_source_database_list_text_output(sqlite_db: str) -> None:
         [
             "database",
             "list",
+            "--conn",
             sqlite_db,
             "--type",
             "sqlite",
@@ -90,6 +91,7 @@ def test_source_database_list_json_output(sqlite_db: str) -> None:
         [
             "database",
             "list",
+            "--conn",
             sqlite_db,
             "--type",
             "sqlite",
@@ -169,6 +171,7 @@ def test_source_database_list_empty_database(tmp_path: Path) -> None:
         [
             "database",
             "list",
+            "--conn",
             connection_string,
             "--type",
             "sqlite",

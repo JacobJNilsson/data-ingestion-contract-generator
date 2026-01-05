@@ -38,7 +38,9 @@ def test_destination_database_cli(tmp_path: Path) -> None:
         app,
         [
             "database",
+            "--conn",
             connection_string,
+            "--table",
             "products",
             "--id",
             "products_dest",
@@ -74,7 +76,9 @@ def test_destination_database_cli_table_not_found(tmp_path: Path) -> None:
         app,
         [
             "database",
+            "--conn",
             connection_string,
+            "--table",
             "missing_table",
             "--id",
             "dest",
