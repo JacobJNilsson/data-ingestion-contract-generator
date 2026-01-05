@@ -276,16 +276,22 @@ def source_supabase_analyze(
 ) -> None:
     """Generate source contract from Supabase table.
 
-    Uses Supabase's PostgREST API for authentication and data access.
+    Uses PostgREST OpenAPI schema to read actual PostgreSQL table definitions.
+    Works with empty tables - no data required!
+
+    FEATURES:
+    - Reads actual PostgreSQL schema (not inferred from data)
+    - Works with empty tables
+    - Proper data type detection
+    - Nullable detection from schema
 
     LIMITATIONS:
-    - Primary keys: Not detected (PostgREST does not expose schema metadata)
-    - Data types: Inferred from sample data values, not PostgreSQL schema
-    - Empty tables: Cannot generate contracts (no data to infer from)
-    - RLS policies: May limit visible data based on API key permissions
+    - Primary keys: Not exposed in OpenAPI schema
+    - Foreign keys: Not exposed in OpenAPI schema
+    - Default values: Not exposed in OpenAPI schema
 
-    For full schema introspection with primary keys, use the database source
-    command with a PostgreSQL connection string instead.
+    For full schema introspection with primary keys and foreign keys, use the 
+    database source command with a PostgreSQL connection string instead.
 
     Example:
         contract-gen source supabase analyze --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --output contracts/users.json

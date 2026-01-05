@@ -102,10 +102,10 @@ contract-gen source database postgresql --conn "postgresql://user:pass@localhost
 # List available Supabase tables
 contract-gen source supabase list --url https://xxxxx.supabase.co --api-key eyJhbGc...
 
-# Generate source contract from Supabase (simple, but no primary keys)
+# Generate source contract from Supabase (uses actual PostgreSQL schema, works with empty tables!)
 contract-gen source supabase analyze --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --output contracts/users.json
 
-# For full schema introspection with primary keys, use database source instead:
+# For full schema introspection with primary keys and foreign keys, use database source:
 contract-gen source database list --conn "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres" --type postgresql
 
 # Generate destination contract (CSV)

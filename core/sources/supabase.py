@@ -1,13 +1,18 @@
-"""Supabase table analysis using PostgREST API.
+"""Supabase table analysis using PostgREST OpenAPI schema.
+
+Uses PostgREST's OpenAPI endpoint to read actual PostgreSQL schema definitions.
 
 LIMITATIONS:
-- Empty tables: Cannot introspect schema from empty tables (PostgREST limitation)
-- Primary keys: Not detected (PostgREST doesn't expose PK metadata easily)
-- Type inference: Based on sample data values, not PostgreSQL schema:
-  - JSON/JSONB fields are inferred as "text"
-  - Array types inferred from first element only
-  - May be inaccurate for sparse or heterogeneous data
-- Row Level Security: Tables with RLS may appear empty or return partial data
+- Primary keys: Not exposed in OpenAPI schema (PostgREST limitation)
+- Foreign keys: Not exposed in OpenAPI schema
+- Default values: Not exposed in OpenAPI schema
+- Row Level Security: Tables with RLS may not appear in schema if not accessible
+
+ADVANTAGES over data inference:
+- Works with empty tables
+- Uses actual PostgreSQL data types (not inferred from values)
+- Accurate nullable detection from schema
+- No need to sample data
 """
 
 import httpx
@@ -22,6 +27,66 @@ from core.models import (
     SourceSchema,
     SupabaseMetadata,
 )
+
+
+def _map_openapi_type_to_contract(field_spec: dict[str, object]) -> str:
+    """Map OpenAPI type specification to contract data type.
+
+    Args:
+        field_spec: OpenAPI property specification with type and format
+
+    Returns:
+        Contract data type string
+    """
+    if not isinstance(field_spec, dict):
+        return "text"
+
+    field_type = field_spec.get("type")
+    if not isinstance(field_type, str):
+        field_type = "string"
+
+    field_format = field_spec.get("format")
+    if not isinstance(field_format, str):
+        field_format = None
+
+    # Handle arrays
+    if field_type == "array":
+        items = field_spec.get("items")
+        if isinstance(items, dict):
+            element_type = _map_openapi_type_to_contract(items)
+            return f"array[{element_type}]"
+        return "array[text]"
+
+    # Map based on type + format
+    if field_type == "integer":
+        if field_format == "int64":
+            return "bigint"
+        return "integer"
+
+    if field_type == "number":
+        if field_format == "double":
+            return "double precision"
+        return "numeric"
+
+    if field_type == "boolean":
+        return "boolean"
+
+    if field_type == "string":
+        # Use format to determine specific string types
+        if field_format == "date":
+            return "date"
+        if field_format == "date-time":
+            return "timestamp"
+        if field_format == "time":
+            return "time"
+        if field_format == "uuid":
+            return "uuid"
+        if field_format == "binary":
+            return "bytea"
+        return "text"
+
+    # Default to text for unknown types
+    return "text"
 
 
 def _validate_project_url(project_url: str) -> None:
@@ -349,15 +414,18 @@ def analyze_supabase_table(
     project_url: str,
     api_key: str,
     table_name: str,
-    sample_size: int = 1000,
+    sample_size: int = 0,
 ) -> tuple[SourceSchema, QualityObservation, SupabaseMetadata]:
-    """Analyze a Supabase table and extract schema, quality metrics, and metadata.
+    """Analyze a Supabase table using OpenAPI schema definition.
+
+    Reads actual PostgreSQL schema from PostgREST OpenAPI endpoint.
+    Works with empty tables - no data sampling required for schema.
 
     Args:
         project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
         api_key: Supabase API key (anon or service_role key)
         table_name: Table name to analyze
-        sample_size: Number of rows to sample for quality analysis
+        sample_size: Number of rows to sample for quality metrics (default: 0, schema only)
 
     Returns:
         Tuple of (SourceSchema, QualityObservation, SupabaseMetadata)
@@ -366,35 +434,55 @@ def analyze_supabase_table(
         ValueError: If table is not found, connection fails, or URL is invalid
 
     Note:
-        - Types are inferred from sample data, not PostgreSQL schema
-        - Empty tables will raise an error (cannot infer schema)
-        - Primary keys are not detected (PostgREST limitation)
-        - Tables with RLS policies may return limited or no data
+        - Uses actual PostgreSQL schema from OpenAPI (not inferred from data)
+        - Works with empty tables
+        - Primary keys not available in OpenAPI schema
+        - If sample_size > 0, will fetch sample data for quality metrics
     """
     _validate_project_url(project_url)
 
     try:
-        # Create Supabase client
-        supabase: Client = create_client(project_url, api_key)
+        # Get schema from OpenAPI
+        fields, metadata = analyze_supabase_table_from_schema(project_url, api_key, table_name)
 
-        # Fetch sample data
-        field_names, sample_rows, total_rows = _fetch_sample_data(supabase, table_name, sample_size)
-
-        # Build field definitions
-        fields, nullable_columns = _build_field_definitions(field_names, sample_rows)
-
-        # Create schema
+        # Create source schema
         source_schema = SourceSchema(fields=fields)
 
-        # Build quality observation
-        quality_observation = _build_quality_observation(field_names, sample_rows, total_rows, nullable_columns)
-
-        # Build metadata
-        supabase_metadata = _build_supabase_metadata_from_fields(
-            project_url, table_name, fields, nullable_columns, len(sample_rows)
+        # Initialize empty quality observation
+        quality_observation = QualityObservation(
+            total_rows=0,
+            expectation=None,
+            observed_profiling={},
         )
 
-        return source_schema, quality_observation, supabase_metadata
+        # Optionally sample data for quality metrics
+        if sample_size > 0:
+            try:
+                supabase: Client = create_client(project_url, api_key)
+
+                # Fetch sample data
+                field_names, sample_rows, total_rows = _fetch_sample_data(supabase, table_name, sample_size)
+
+                # Build quality observation with actual data
+                nullable_columns = [f.name for f in fields if f.nullable]
+                quality_observation = _build_quality_observation(field_names, sample_rows, total_rows, nullable_columns)
+
+                # Update metadata with sample size
+                metadata = SupabaseMetadata(
+                    project_url=metadata.project_url,
+                    table_name=metadata.table_name,
+                    primary_keys=metadata.primary_keys,
+                    column_count=metadata.column_count,
+                    nullable_columns=metadata.nullable_columns,
+                    sample_size=len(sample_rows),
+                    columns=metadata.columns,
+                )
+
+            except Exception:
+                # If sampling fails (e.g., empty table, RLS), continue with schema-only info
+                pass
+
+        return source_schema, quality_observation, metadata
 
     except Exception as e:
         raise _handle_supabase_error(e, table_name) from e
@@ -459,6 +547,112 @@ def _extract_table_names(openapi_schema: dict[str, object]) -> list[str]:
                 tables.append(table_name)
 
     return sorted(tables)
+
+
+def analyze_supabase_table_from_schema(
+    project_url: str,
+    api_key: str,
+    table_name: str,
+) -> tuple[list[FieldDefinition], SupabaseMetadata]:
+    """Analyze Supabase table using OpenAPI schema definition.
+
+    Reads actual PostgreSQL schema from PostgREST OpenAPI endpoint.
+    Works with empty tables - no data sampling required.
+
+    Args:
+        project_url: Supabase project URL
+        api_key: Supabase API key
+        table_name: Table name to analyze
+
+    Returns:
+        Tuple of (field_definitions, metadata)
+
+    Raises:
+        ValueError: If table not found or not accessible
+    """
+    _validate_project_url(project_url)
+
+    # Fetch OpenAPI schema
+    openapi_schema = _fetch_openapi_schema(project_url, api_key)
+
+    # Extract table schema from components.schemas
+    components = openapi_schema.get("components", {})
+    if not isinstance(components, dict):
+        raise ValueError("Invalid OpenAPI schema: missing components")
+
+    schemas = components.get("schemas", {})
+    if not isinstance(schemas, dict):
+        raise ValueError("Invalid OpenAPI schema: missing schemas")
+
+    table_schema = schemas.get(table_name)
+    if not table_schema or not isinstance(table_schema, dict):
+        raise ValueError(
+            f"Table '{table_name}' not found or not accessible. "
+            f"Check that the table exists, is exposed through PostgREST, "
+            f"and the API key has appropriate permissions."
+        )
+
+    # Parse properties and required fields
+    properties = table_schema.get("properties", {})
+    if not isinstance(properties, dict):
+        raise ValueError(f"Invalid schema for table '{table_name}': missing properties")
+
+    required = table_schema.get("required", [])
+    if not isinstance(required, list):
+        required = []
+
+    # Convert to FieldDefinitions
+    fields: list[FieldDefinition] = []
+    nullable_columns: list[str] = []
+
+    for field_name, field_spec in properties.items():
+        if not isinstance(field_spec, dict):
+            continue
+
+        # Map OpenAPI type to contract type
+        data_type = _map_openapi_type_to_contract(field_spec)
+
+        # Nullable if not in required array
+        nullable = field_name not in required
+        if nullable:
+            nullable_columns.append(field_name)
+
+        # Build constraints
+        constraints: list[FieldConstraint] = []
+        if not nullable:
+            constraints.append(FieldConstraint(type="not_null"))
+
+        fields.append(
+            FieldDefinition(
+                name=field_name,
+                data_type=data_type,
+                nullable=nullable,
+                constraints=constraints,
+            )
+        )
+
+    # Build metadata
+    column_details = [
+        ColumnInfo(
+            name=field.name,
+            type=field.data_type,
+            nullable=field.nullable,
+            default=None,  # OpenAPI doesn't expose defaults
+        )
+        for field in fields
+    ]
+
+    metadata = SupabaseMetadata(
+        project_url=project_url,
+        table_name=table_name,
+        primary_keys=[],  # OpenAPI doesn't expose PKs
+        column_count=len(fields),
+        nullable_columns=nullable_columns,
+        sample_size=0,  # No sampling needed
+        columns=column_details,
+    )
+
+    return fields, metadata
 
 
 def list_supabase_tables(project_url: str, api_key: str) -> list[str]:
