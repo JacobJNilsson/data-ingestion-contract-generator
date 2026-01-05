@@ -10,6 +10,7 @@ from core.contract_generator import (
     generate_destination_contract,
     generate_json_source_contract,
     generate_source_analysis,
+    generate_supabase_source_contract,
     generate_transformation_contract,
 )
 from core.models import (
@@ -351,6 +352,48 @@ class ContractHandler:
             # Log with sanitized connection string
             sanitized_conn = sanitize_connection_string(connection_string)
             error_msg = f"Failed to generate multi-table contracts for {sanitized_conn}: {e!s}"
+            return json.dumps({"error": error_msg}, indent=2)
+
+    def generate_supabase_source_contract(
+        self,
+        source_id: str,
+        project_url: str,
+        api_key: str,
+        table_name: str,
+        sample_size: int = 1000,
+        config: dict[str, object] | None = None,
+    ) -> str:
+        """Generate a source contract from a Supabase table
+
+        Args:
+            source_id: Unique identifier for this source
+            project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
+            api_key: Supabase API key (anon or service_role key)
+            table_name: Table name to analyze
+            sample_size: Number of rows to sample for analysis
+            config: Optional configuration dictionary
+
+        Returns:
+            JSON string of the generated source contract
+        """
+        try:
+            # Generate contract
+            contract = generate_supabase_source_contract(
+                project_url=project_url,
+                api_key=api_key,
+                table_name=table_name,
+                source_id=source_id,
+                sample_size=sample_size,
+                config=config,
+            )
+
+            result: str = contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
+            return result
+
+        except ValueError as e:
+            return json.dumps({"error": f"Validation error: {e!s}"}, indent=2)
+        except Exception as e:
+            error_msg = f"Failed to generate Supabase source contract for table '{table_name}': {e!s}"
             return json.dumps({"error": error_msg}, indent=2)
 
     def analyze_source(self, source_path: str) -> str:

@@ -17,10 +17,12 @@ from core.models import (
     QualityObservation,
     SourceAnalysisResult,
     SourceSchema,
+    SupabaseSourceContract,
     TransformationContract,
 )
 from core.sources.csv import analyze_csv_file
 from core.sources.json import analyze_json_file
+from core.sources.supabase import analyze_supabase_table
 
 
 def generate_source_analysis(source_path: str, sample_size: int = 1000) -> SourceAnalysisResult:
@@ -177,6 +179,55 @@ def generate_json_source_contract(
         schema=schema,
         quality=quality,
         metadata=metadata,
+    )
+
+
+def generate_supabase_source_contract(
+    project_url: str,
+    api_key: str,
+    table_name: str,
+    source_id: str | None = None,
+    sample_size: int = 1000,
+    config: dict[str, Any] | None = None,
+) -> SupabaseSourceContract:
+    """Generate a source contract for a Supabase table
+
+    Args:
+        project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
+        api_key: Supabase API key (anon or service_role key)
+        table_name: Table name to analyze
+        source_id: Unique identifier for this source (e.g., 'users_supabase').
+                   If not provided, will be auto-generated from the table name.
+        sample_size: Number of rows to sample for analysis (default: 1000)
+        config: Optional configuration dictionary
+
+    Returns:
+        SupabaseSourceContract
+    """
+    # Analyze Supabase table
+    schema, quality, supabase_metadata = analyze_supabase_table(
+        project_url=project_url,
+        api_key=api_key,
+        table_name=table_name,
+        sample_size=sample_size,
+    )
+
+    # Auto-generate source_id from table name if not provided
+    if source_id is None:
+        source_id = table_name.lower().replace(" ", "_").replace("-", "_")
+
+    # Convert metadata to dict and merge with config
+    metadata_dict = supabase_metadata.model_dump(exclude_none=True)
+    if config:
+        metadata_dict.update(config)
+
+    return SupabaseSourceContract(
+        source_id=source_id,
+        project_url=project_url,
+        table_name=table_name,
+        schema=schema,
+        quality=quality,
+        metadata=metadata_dict,
     )
 
 

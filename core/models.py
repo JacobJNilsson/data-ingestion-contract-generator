@@ -174,6 +174,18 @@ class QueryMetadata(BaseModel):
     sample_size: int = Field(description="Number of rows sampled for analysis")
 
 
+class SupabaseMetadata(BaseModel):
+    """Metadata for a Supabase table analysis"""
+
+    project_url: str = Field(description="Supabase project URL")
+    table_name: str = Field(description="Table name")
+    primary_keys: list[str] = Field(default_factory=list, description="List of primary key column names")
+    column_count: int = Field(description="Number of columns in the table")
+    nullable_columns: list[str] = Field(default_factory=list, description="List of nullable column names")
+    sample_size: int = Field(description="Number of rows sampled for analysis")
+    columns: list[ColumnInfo] = Field(default_factory=list, description="Detailed column information")
+
+
 class SchemaInfo(BaseModel):
     """Schema information extracted from a source (table or API)"""
 
@@ -279,21 +291,29 @@ class DatabaseSourceContract(BaseSourceContract):
     database_schema: str | None = Field(default=None, description="Database schema name (if applicable)")
 
 
+class SupabaseSourceContract(BaseSourceContract):
+    """Contract for Supabase data sources"""
+
+    source_format: Literal["supabase"] = "supabase"
+    project_url: str = Field(description="Supabase project URL")
+    table_name: str = Field(description="Table name")
+
+
 # Source contract discriminated union - Pydantic automatically dispatches based on source_format
 SourceContract = Annotated[
-    CSVSourceContract | JSONSourceContract | DatabaseSourceContract,
+    CSVSourceContract | JSONSourceContract | DatabaseSourceContract | SupabaseSourceContract,
     Field(discriminator="source_format"),
 ]
 
 # TypeAdapter for validating SourceContract discriminated union
-_source_contract_adapter: TypeAdapter[CSVSourceContract | JSONSourceContract | DatabaseSourceContract] = TypeAdapter(
-    SourceContract
-)
+_source_contract_adapter: TypeAdapter[
+    CSVSourceContract | JSONSourceContract | DatabaseSourceContract | SupabaseSourceContract
+] = TypeAdapter(SourceContract)
 
 
 def validate_source_contract(
     data: dict[str, Any] | str,
-) -> CSVSourceContract | JSONSourceContract | DatabaseSourceContract:
+) -> CSVSourceContract | JSONSourceContract | DatabaseSourceContract | SupabaseSourceContract:
     """Validate and parse a source contract from dict or JSON string.
 
     Uses Pydantic's TypeAdapter to properly handle the discriminated union.
