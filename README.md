@@ -97,7 +97,16 @@ The `contract-gen` CLI provides direct access to contract generation and validat
 contract-gen source csv data/transactions.csv --id transactions --output contracts/source.json
 
 # Generate source contract from Database
-contract-gen source db postgresql --conn "postgresql://user:pass@localhost:5432/db" --table users --output contracts/users.json
+contract-gen source database postgresql --conn "postgresql://user:pass@localhost:5432/db" --table users --output contracts/users.json
+
+# List available Supabase tables
+contract-gen source supabase list https://xxxxx.supabase.co eyJhbGc...
+
+# Generate source contract from Supabase (simple, but no primary keys)
+contract-gen source supabase analyze https://xxxxx.supabase.co eyJhbGc... users --output contracts/users.json
+
+# For full schema introspection with primary keys, use database source instead:
+contract-gen source database postgresql --conn "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres" --table users --output contracts/users.json
 
 # Generate destination contract
 contract-gen destination csv --id output_data --output contracts/destination.json
@@ -112,7 +121,8 @@ contract-gen --help
 **Key features:**
 
 - Auto-detects CSV encoding and delimiters
-- Support for PostgreSQL, MySQL, and SQLite
+- Support for PostgreSQL, MySQL, SQLite, and Supabase
+- Native Supabase integration with API key authentication
 - Multiple output formats (JSON, YAML)
 - Pretty-printed output with syntax highlighting
 - Comprehensive validation with detailed error messages
