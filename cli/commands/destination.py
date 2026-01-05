@@ -42,10 +42,10 @@ def destination_csv(
 
 @app.command("database")
 def destination_database(
-    connection_string: str = typer.Argument(
-        ..., help="Database connection string (e.g. postgresql://user:pass@host/db)"
+    connection_string: str = typer.Option(
+        ..., "--conn", help="Database connection string (e.g. postgresql://user:pass@host/db)"
     ),
-    table_name: str = typer.Argument(..., help="Table name to inspect"),
+    table_name: str = typer.Option(..., "--table", help="Table name to inspect"),
     destination_id: str = typer.Option(..., "--id", help="Unique identifier for this destination"),
     database_type: str = typer.Option(..., "--type", help="Database type: postgresql, mysql, or sqlite"),
     database_schema: str | None = typer.Option(
@@ -60,7 +60,7 @@ def destination_database(
     """Generate destination contract from a database table.
 
     Example:
-        contract-gen destination database postgresql://user:pass@localhost/db my_table --id my_dest --type postgresql
+        contract-gen destination database --conn postgresql://user:pass@localhost/db --table my_table --id my_dest --type postgresql
     """
     try:
         # Load config for defaults
@@ -97,9 +97,11 @@ def destination_database(
 
 @app.command("supabase")
 def destination_supabase(
-    project_url: str = typer.Argument(..., help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
-    api_key: str = typer.Argument(..., help="Supabase API key (service_role key recommended for write access)"),
-    table_name: str = typer.Argument(..., help="Table name to use as destination"),
+    project_url: str = typer.Option(..., "--url", help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
+    api_key: str = typer.Option(
+        ..., "--api-key", help="Supabase API key (service_role key recommended for write access)"
+    ),
+    table_name: str = typer.Option(..., "--table", help="Table name to use as destination"),
     destination_id: str = typer.Option(..., "--id", help="Unique identifier for this destination"),
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
@@ -117,7 +119,7 @@ def destination_supabase(
     - For full schema introspection with primary keys, use database destination instead
 
     Example:
-        contract-gen destination supabase https://xxxxx.supabase.co eyJhbGc... users --id dest_users --output contracts/dest.json
+        contract-gen destination supabase --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --id dest_users --output contracts/dest.json
     """
     try:
         # Load config for defaults
