@@ -188,8 +188,8 @@ def _format_table_text(table: TableInfo, with_fields: bool) -> list[str]:
 
 @database_app.command("list")
 def source_database_list(
-    connection_string: str = typer.Argument(
-        ..., help="Database connection string (e.g. postgresql://user:pass@host/db)"
+    connection_string: str = typer.Option(
+        ..., "--conn", help="Database connection string (e.g. postgresql://user:pass@host/db)"
     ),
     database_type: str = typer.Option(..., "--type", help="Database type: postgresql, mysql, or sqlite"),
     schema: str | None = typer.Option(
@@ -201,7 +201,7 @@ def source_database_list(
     """List tables in a database.
 
     Example:
-        contract-gen source database list postgresql://user:pass@host/db --type postgresql
+        contract-gen source database list --conn postgresql://user:pass@host/db --type postgresql
     """
     try:
         table_infos = list_database_tables(
@@ -261,9 +261,9 @@ def _load_supabase_defaults(
 
 @supabase_app.command("analyze")
 def source_supabase_analyze(
-    project_url: str = typer.Argument(..., help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
-    api_key: str = typer.Argument(..., help="Supabase API key (anon or service_role key)"),
-    table: str = typer.Argument(..., help="Table name to analyze"),
+    project_url: str = typer.Option(..., "--url", help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
+    api_key: str = typer.Option(..., "--api-key", help="Supabase API key (anon or service_role key)"),
+    table: str = typer.Option(..., "--table", help="Table name to analyze"),
     source_id: str | None = typer.Option(
         None, "--id", help="Unique identifier for this source (default: derived from table name)"
     ),
@@ -288,7 +288,7 @@ def source_supabase_analyze(
     command with a PostgreSQL connection string instead.
 
     Example:
-        contract-gen source supabase analyze https://xxxxx.supabase.co eyJhbGc... users --output contracts/users.json
+        contract-gen source supabase analyze --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --output contracts/users.json
     """
     try:
         # Load defaults
@@ -318,8 +318,8 @@ def source_supabase_analyze(
 
 @supabase_app.command("list")
 def source_supabase_list(
-    project_url: str = typer.Argument(..., help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
-    api_key: str = typer.Argument(..., help="Supabase API key (anon or service_role key)"),
+    project_url: str = typer.Option(..., "--url", help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
+    api_key: str = typer.Option(..., "--api-key", help="Supabase API key (anon or service_role key)"),
     output_format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
 ) -> None:
     """List all tables available in the Supabase project.
@@ -332,7 +332,7 @@ def source_supabase_list(
     - Not hidden by Row Level Security (RLS) policies
 
     Example:
-        contract-gen source supabase list https://xxxxx.supabase.co eyJhbGc...
+        contract-gen source supabase list --url https://xxxxx.supabase.co --api-key eyJhbGc...
     """
     try:
         tables = list_supabase_tables(project_url, api_key)

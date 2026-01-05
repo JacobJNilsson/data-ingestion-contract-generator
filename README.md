@@ -100,19 +100,22 @@ contract-gen source csv data/transactions.csv --id transactions --output contrac
 contract-gen source database postgresql --conn "postgresql://user:pass@localhost:5432/db" --table users --output contracts/users.json
 
 # List available Supabase tables
-contract-gen source supabase list https://xxxxx.supabase.co eyJhbGc...
+contract-gen source supabase list --url https://xxxxx.supabase.co --api-key eyJhbGc...
 
 # Generate source contract from Supabase (simple, but no primary keys)
-contract-gen source supabase analyze https://xxxxx.supabase.co eyJhbGc... users --output contracts/users.json
+contract-gen source supabase analyze --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --output contracts/users.json
 
 # For full schema introspection with primary keys, use database source instead:
-contract-gen source database postgresql --conn "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres" --table users --output contracts/users.json
+contract-gen source database list --conn "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres" --type postgresql
 
 # Generate destination contract (CSV)
 contract-gen destination csv --id output_data --output contracts/destination.json
 
 # Generate destination contract (Supabase - service_role key recommended)
-contract-gen destination supabase https://xxxxx.supabase.co eyJhbGc... users --id users_dest
+contract-gen destination supabase --url https://xxxxx.supabase.co --api-key eyJhbGc... --table users --id users_dest
+
+# Generate destination contract (Database)
+contract-gen destination database --conn postgresql://user:pass@localhost/db --table my_table --id my_dest --type postgresql
 
 # Validate contracts
 contract-gen validate contracts/source.json
