@@ -202,6 +202,43 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="generate_supabase_destination_contract",
+            description=(
+                "Generate a destination contract for a Supabase table using PostgREST API. "
+                "Validates table access and infers schema from sample data. "
+                "NOTES: Service role key recommended for full write access validation. "
+                "Schema inferred from sample data (requires at least one row). "
+                "For full schema introspection with primary keys, use database destination instead. "
+                "Returns the contract as JSON."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "destination_id": {
+                        "type": "string",
+                        "description": "Unique identifier for this destination (e.g., 'users_supabase_dest')",
+                    },
+                    "project_url": {
+                        "type": "string",
+                        "description": "Supabase project URL (e.g., 'https://xxxxx.supabase.co')",
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "Supabase API key (service_role key recommended for write access)",
+                    },
+                    "table_name": {
+                        "type": "string",
+                        "description": "Table name to use as destination",
+                    },
+                    "config": {
+                        "type": "object",
+                        "description": "Optional configuration/metadata dictionary",
+                    },
+                },
+                "required": ["destination_id", "project_url", "api_key", "table_name"],
+            },
+        ),
+        Tool(
             name="list_database_tables",
             description=(
                 "List all tables in a database or schema with metadata. "
@@ -322,6 +359,7 @@ async def call_tool(name: str, arguments: dict[str, object]) -> list[TextContent
         "generate_transformation_contract": contract_handler.generate_transformation_contract,
         "generate_database_source_contract": contract_handler.generate_database_source_contract,
         "generate_supabase_source_contract": contract_handler.generate_supabase_source_contract,
+        "generate_supabase_destination_contract": contract_handler.generate_supabase_destination_contract,
         "generate_database_multi_source_contracts": contract_handler.generate_database_multi_source_contracts,
         "list_database_tables": contract_handler.list_database_tables,
         "analyze_source": contract_handler.analyze_source,

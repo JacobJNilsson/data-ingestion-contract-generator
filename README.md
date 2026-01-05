@@ -108,8 +108,11 @@ contract-gen source supabase analyze https://xxxxx.supabase.co eyJhbGc... users 
 # For full schema introspection with primary keys, use database source instead:
 contract-gen source database postgresql --conn "postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres" --table users --output contracts/users.json
 
-# Generate destination contract
+# Generate destination contract (CSV)
 contract-gen destination csv --id output_data --output contracts/destination.json
+
+# Generate destination contract (Supabase - service_role key recommended)
+contract-gen destination supabase https://xxxxx.supabase.co eyJhbGc... users --id users_dest
 
 # Validate contracts
 contract-gen validate contracts/source.json
