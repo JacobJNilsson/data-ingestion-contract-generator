@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from cli.output import error_message, handle_permission_error, output_contract
-from core.contract_generator import generate_destination_contract
+from core.contract_generator import generate_destination_contract, generate_supabase_destination_contract
 
 app = typer.Typer(help="Generate destination contracts")
 
@@ -89,6 +89,63 @@ def destination_database(
 
     except ValueError as e:
         error_message(str(e), hint="Check your connection string and table name")
+        raise typer.Exit(1) from e
+    except Exception as e:
+        error_message(f"Failed to generate destination contract: {e}")
+        raise typer.Exit(1) from e
+
+
+@app.command("supabase")
+def destination_supabase(
+    project_url: str = typer.Argument(..., help="Supabase project URL (e.g., https://xxxxx.supabase.co)"),
+    api_key: str = typer.Argument(..., help="Supabase API key (service_role key recommended for write access)"),
+    table_name: str = typer.Argument(..., help="Table name to use as destination"),
+    destination_id: str = typer.Option(..., "--id", help="Unique identifier for this destination"),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Output file path (default: stdout)", dir_okay=False, resolve_path=True
+    ),
+    output_format: str | None = typer.Option(None, "--format", "-f", help="Output format: json or yaml"),
+    pretty: bool | None = typer.Option(None, "--pretty", help="Pretty-print JSON output"),
+) -> None:
+    """Generate destination contract for Supabase table.
+
+    Uses Supabase's PostgREST API to validate table access and infer schema.
+
+    NOTES:
+    - Service role key recommended for full write access validation
+    - Schema inferred from sample data (requires at least one row in table)
+    - For full schema introspection with primary keys, use database destination instead
+
+    Example:
+        contract-gen destination supabase https://xxxxx.supabase.co eyJhbGc... users --id dest_users --output contracts/dest.json
+    """
+    try:
+        # Load config for defaults
+        from cli.config import get_output_defaults
+
+        output_defaults = get_output_defaults()
+
+        # Apply defaults from config if not specified via CLI
+        if output_format is None:
+            output_format = output_defaults.format
+        if pretty is None:
+            pretty = output_defaults.pretty
+
+        # Generate contract
+        contract = generate_supabase_destination_contract(
+            destination_id=destination_id,
+            project_url=project_url,
+            api_key=api_key,
+            table_name=table_name,
+            config=None,
+        )
+
+        # Output
+        contract_json = contract.model_dump_json(by_alias=True, exclude_none=True)
+        output_contract(contract_json, output_path=output, output_format=output_format, pretty=pretty)
+
+    except ValueError as e:
+        error_message(str(e), hint="Check the project URL, API key, and table name")
         raise typer.Exit(1) from e
     except Exception as e:
         error_message(f"Failed to generate destination contract: {e}")

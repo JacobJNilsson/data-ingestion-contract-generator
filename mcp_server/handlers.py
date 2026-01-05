@@ -10,6 +10,7 @@ from core.contract_generator import (
     generate_destination_contract,
     generate_json_source_contract,
     generate_source_analysis,
+    generate_supabase_destination_contract,
     generate_supabase_source_contract,
     generate_transformation_contract,
 )
@@ -161,6 +162,43 @@ class ContractHandler:
             return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
         except (ValueError, OSError, ValidationError) as e:
             return json.dumps({"error": f"Failed to generate source contract: {e!s}"}, indent=2)
+
+    def generate_supabase_destination_contract(
+        self,
+        destination_id: str,
+        project_url: str,
+        api_key: str,
+        table_name: str,
+        config: dict[str, object] | None = None,
+    ) -> str:
+        """Generate a destination contract for a Supabase table
+
+        Args:
+            destination_id: Unique identifier for this destination
+            project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
+            api_key: Supabase API key (service_role key recommended for write access)
+            table_name: Table name to use as destination
+            config: Optional configuration dictionary
+
+        Returns:
+            JSON string of the generated destination contract
+
+        Note:
+            - Service role key recommended for full write access validation
+            - Schema inferred from sample data (requires at least one row)
+            - For full schema introspection, use generate_database_destination_contract
+        """
+        try:
+            contract = generate_supabase_destination_contract(
+                destination_id=destination_id,
+                project_url=project_url,
+                api_key=api_key,
+                table_name=table_name,
+                config=config,
+            )
+            return contract.model_dump_json(indent=2, exclude_none=True, by_alias=True)
+        except (ValueError, TypeError, ValidationError) as e:
+            return json.dumps({"error": f"Failed to generate Supabase destination contract: {e!s}"}, indent=2)
 
     def generate_destination_contract(
         self,

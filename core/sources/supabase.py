@@ -490,3 +490,48 @@ def list_supabase_tables(project_url: str, api_key: str) -> list[str]:
         return _extract_table_names(openapi_schema)
     except Exception as e:
         raise ValueError(f"Failed to list Supabase tables: {e}") from e
+
+
+def validate_supabase_table_for_destination(
+    project_url: str,
+    api_key: str,
+    table_name: str,
+) -> SourceSchema:
+    """Validate a Supabase table exists and return its schema for destination contract.
+
+    This is a lighter version of analyze_supabase_table focused on validation
+    for destination contracts. It verifies the table exists and is writable,
+    and returns basic schema information.
+
+    Args:
+        project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
+        api_key: Supabase API key (service_role key recommended for destinations)
+        table_name: Table name to validate
+
+    Returns:
+        SourceSchema with field definitions inferred from sample data
+
+    Raises:
+        ValueError: If table is not found, connection fails, or URL is invalid
+
+    Note:
+        - Requires at least one row in the table to infer schema
+        - Uses the same type inference as source contracts
+        - Service role key recommended for full write access validation
+    """
+    _validate_project_url(project_url)
+
+    try:
+        # Create Supabase client
+        supabase: Client = create_client(project_url, api_key)
+
+        # Fetch schema by checking first row
+        field_names, sample_rows, _ = _fetch_sample_data(supabase, table_name, sample_size=100)
+
+        # Build field definitions
+        fields, _ = _build_field_definitions(field_names, sample_rows)
+
+        return SourceSchema(fields=fields)
+
+    except Exception as e:
+        raise _handle_supabase_error(e, table_name) from e

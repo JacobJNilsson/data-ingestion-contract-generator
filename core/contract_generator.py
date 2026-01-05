@@ -231,6 +231,67 @@ def generate_supabase_source_contract(
     )
 
 
+def generate_supabase_destination_contract(
+    destination_id: str,
+    project_url: str,
+    api_key: str,
+    table_name: str,
+    config: dict[str, Any] | None = None,
+) -> DestinationContract:
+    """Generate a destination contract for a Supabase table.
+
+    Uses Supabase's PostgREST API to validate table access and infer schema.
+
+    Args:
+        destination_id: Unique identifier for this destination
+        project_url: Supabase project URL (e.g., https://xxxxx.supabase.co)
+        api_key: Supabase API key (service_role key recommended for write access)
+        table_name: Table name to use as destination
+        config: Optional configuration dictionary
+
+    Returns:
+        Destination contract model
+
+    Raises:
+        ValueError: If table is not found or connection fails
+
+    Note:
+        - Service role key recommended for full write access
+        - Schema inferred from sample data (requires at least one row)
+        - For full schema introspection, use database destination with PostgreSQL connection
+    """
+    from core.sources.supabase import validate_supabase_table_for_destination
+
+    try:
+        # Validate table and get schema
+        schema_info = validate_supabase_table_for_destination(project_url, api_key, table_name)
+
+        # Convert to destination schema format
+        schema_dict = schema_info.model_dump(exclude_none=True)
+
+        # Build metadata
+        metadata = config.copy() if config else {}
+        metadata.update(
+            {
+                "destination_type": "supabase",
+                "project_url": project_url,
+                "table_name": table_name,
+            }
+        )
+
+        # Parse schema
+        dest_schema = DestinationSchema(fields=_parse_destination_fields(schema_dict))
+
+        return DestinationContract(
+            destination_id=destination_id,
+            schema=dest_schema,
+            metadata=metadata,
+        )
+
+    except Exception as e:
+        raise ValueError(f"Failed to generate Supabase destination contract: {e}") from e
+
+
 def generate_destination_contract(
     destination_id: str,
     schema: dict[str, Any] | None = None,
